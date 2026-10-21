@@ -1,0 +1,2046 @@
+[
+  {
+    "id": "dropDefault.User.id",
+    "label": "Drop default on \"User\".\"id\"",
+    "operationClass": "widening",
+    "target": {
+      "id": "postgres",
+      "details": {
+        "schema": "public",
+        "objectType": "column",
+        "name": "id",
+        "table": "User"
+      }
+    },
+    "precheck": [
+      {
+        "description": "ensure column \"id\" exists",
+        "sql": "SELECT EXISTS (SELECT 1 AS \"one\" FROM \"information_schema\".\"columns\" WHERE (\"table_schema\" = $1 AND \"table_name\" = $2 AND \"column_name\" = $3)) AS \"result\"",
+        "params": [
+          "public",
+          "User",
+          "id"
+        ]
+      }
+    ],
+    "execute": [
+      {
+        "description": "drop default on \"id\"",
+        "sql": "ALTER TABLE \"public\".\"User\" ALTER COLUMN \"id\" DROP DEFAULT"
+      }
+    ],
+    "postcheck": [
+      {
+        "description": "verify column \"id\" has no default",
+        "sql": "SELECT EXISTS (SELECT 1 AS \"one\" FROM \"information_schema\".\"columns\" WHERE (\"table_schema\" = $1 AND \"table_name\" = $2 AND \"column_name\" = $3 AND \"column_default\" IS NULL)) AS \"result\"",
+        "params": [
+          "public",
+          "User",
+          "id"
+        ]
+      }
+    ]
+  },
+  {
+    "id": "table.GroupPermissionAssignment",
+    "label": "Create table \"GroupPermissionAssignment\"",
+    "summary": "Creates table \"GroupPermissionAssignment\"",
+    "operationClass": "additive",
+    "target": {
+      "id": "postgres",
+      "details": {
+        "schema": "public",
+        "objectType": "table",
+        "name": "GroupPermissionAssignment"
+      }
+    },
+    "precheck": [
+      {
+        "description": "ensure table \"GroupPermissionAssignment\" does not exist",
+        "sql": "SELECT (to_regclass($1)) IS NULL AS \"result\"",
+        "params": [
+          "\"public\".\"GroupPermissionAssignment\""
+        ]
+      }
+    ],
+    "execute": [
+      {
+        "description": "create table \"GroupPermissionAssignment\"",
+        "sql": "CREATE TABLE \"public\".\"GroupPermissionAssignment\" (\n  \"createdAt\" timestamptz DEFAULT (now()) NOT NULL,\n  \"groupId\" text NOT NULL,\n  \"id\" text NOT NULL,\n  \"permissionId\" text NOT NULL,\n  PRIMARY KEY (\"id\")\n)",
+        "params": []
+      }
+    ],
+    "postcheck": [
+      {
+        "description": "verify table \"GroupPermissionAssignment\" exists",
+        "sql": "SELECT (to_regclass($1)) IS NOT NULL AS \"result\"",
+        "params": [
+          "\"public\".\"GroupPermissionAssignment\""
+        ]
+      }
+    ]
+  },
+  {
+    "id": "table.IngestKey",
+    "label": "Create table \"IngestKey\"",
+    "summary": "Creates table \"IngestKey\"",
+    "operationClass": "additive",
+    "target": {
+      "id": "postgres",
+      "details": {
+        "schema": "public",
+        "objectType": "table",
+        "name": "IngestKey"
+      }
+    },
+    "precheck": [
+      {
+        "description": "ensure table \"IngestKey\" does not exist",
+        "sql": "SELECT (to_regclass($1)) IS NULL AS \"result\"",
+        "params": [
+          "\"public\".\"IngestKey\""
+        ]
+      }
+    ],
+    "execute": [
+      {
+        "description": "create table \"IngestKey\"",
+        "sql": "CREATE TABLE \"public\".\"IngestKey\" (\n  \"createdAt\" timestamptz DEFAULT (now()) NOT NULL,\n  \"createdById\" text NOT NULL,\n  \"expiresAt\" timestamptz,\n  \"id\" text NOT NULL,\n  \"isActive\" bool DEFAULT true NOT NULL,\n  \"keyHash\" text NOT NULL,\n  \"keyPrefix\" text NOT NULL,\n  \"lastUsedAt\" timestamptz,\n  \"name\" text NOT NULL,\n  \"orgId\" text NOT NULL,\n  \"updatedAt\" timestamptz NOT NULL,\n  PRIMARY KEY (\"id\")\n)",
+        "params": []
+      }
+    ],
+    "postcheck": [
+      {
+        "description": "verify table \"IngestKey\" exists",
+        "sql": "SELECT (to_regclass($1)) IS NOT NULL AS \"result\"",
+        "params": [
+          "\"public\".\"IngestKey\""
+        ]
+      }
+    ]
+  },
+  {
+    "id": "table.MemberGroupAssignment",
+    "label": "Create table \"MemberGroupAssignment\"",
+    "summary": "Creates table \"MemberGroupAssignment\"",
+    "operationClass": "additive",
+    "target": {
+      "id": "postgres",
+      "details": {
+        "schema": "public",
+        "objectType": "table",
+        "name": "MemberGroupAssignment"
+      }
+    },
+    "precheck": [
+      {
+        "description": "ensure table \"MemberGroupAssignment\" does not exist",
+        "sql": "SELECT (to_regclass($1)) IS NULL AS \"result\"",
+        "params": [
+          "\"public\".\"MemberGroupAssignment\""
+        ]
+      }
+    ],
+    "execute": [
+      {
+        "description": "create table \"MemberGroupAssignment\"",
+        "sql": "CREATE TABLE \"public\".\"MemberGroupAssignment\" (\n  \"createdAt\" timestamptz DEFAULT (now()) NOT NULL,\n  \"groupId\" text NOT NULL,\n  \"id\" text NOT NULL,\n  \"memberId\" text NOT NULL,\n  PRIMARY KEY (\"id\")\n)",
+        "params": []
+      }
+    ],
+    "postcheck": [
+      {
+        "description": "verify table \"MemberGroupAssignment\" exists",
+        "sql": "SELECT (to_regclass($1)) IS NOT NULL AS \"result\"",
+        "params": [
+          "\"public\".\"MemberGroupAssignment\""
+        ]
+      }
+    ]
+  },
+  {
+    "id": "table.OAuthAccount",
+    "label": "Create table \"OAuthAccount\"",
+    "summary": "Creates table \"OAuthAccount\"",
+    "operationClass": "additive",
+    "target": {
+      "id": "postgres",
+      "details": {
+        "schema": "public",
+        "objectType": "table",
+        "name": "OAuthAccount"
+      }
+    },
+    "precheck": [
+      {
+        "description": "ensure table \"OAuthAccount\" does not exist",
+        "sql": "SELECT (to_regclass($1)) IS NULL AS \"result\"",
+        "params": [
+          "\"public\".\"OAuthAccount\""
+        ]
+      }
+    ],
+    "execute": [
+      {
+        "description": "create table \"OAuthAccount\"",
+        "sql": "CREATE TABLE \"public\".\"OAuthAccount\" (\n  \"accessToken\" text,\n  \"avatarUrl\" text,\n  \"createdAt\" timestamptz DEFAULT (now()) NOT NULL,\n  \"id\" text NOT NULL,\n  \"provider\" text NOT NULL,\n  \"providerAccountId\" text NOT NULL,\n  \"providerEmail\" text,\n  \"refreshToken\" text,\n  \"scope\" text,\n  \"tokenExpiresAt\" timestamptz,\n  \"updatedAt\" timestamptz NOT NULL,\n  \"userId\" text NOT NULL,\n  PRIMARY KEY (\"id\")\n)",
+        "params": []
+      }
+    ],
+    "postcheck": [
+      {
+        "description": "verify table \"OAuthAccount\" exists",
+        "sql": "SELECT (to_regclass($1)) IS NOT NULL AS \"result\"",
+        "params": [
+          "\"public\".\"OAuthAccount\""
+        ]
+      }
+    ]
+  },
+  {
+    "id": "table.Organization",
+    "label": "Create table \"Organization\"",
+    "summary": "Creates table \"Organization\"",
+    "operationClass": "additive",
+    "target": {
+      "id": "postgres",
+      "details": {
+        "schema": "public",
+        "objectType": "table",
+        "name": "Organization"
+      }
+    },
+    "precheck": [
+      {
+        "description": "ensure table \"Organization\" does not exist",
+        "sql": "SELECT (to_regclass($1)) IS NULL AS \"result\"",
+        "params": [
+          "\"public\".\"Organization\""
+        ]
+      }
+    ],
+    "execute": [
+      {
+        "description": "create table \"Organization\"",
+        "sql": "CREATE TABLE \"public\".\"Organization\" (\n  \"createdAt\" timestamptz DEFAULT (now()) NOT NULL,\n  \"createdById\" text NOT NULL,\n  \"id\" text NOT NULL,\n  \"name\" text NOT NULL,\n  \"slug\" text NOT NULL,\n  \"status\" text DEFAULT 'ACTIVE' NOT NULL,\n  \"updatedAt\" timestamptz NOT NULL,\n  PRIMARY KEY (\"id\")\n)",
+        "params": []
+      }
+    ],
+    "postcheck": [
+      {
+        "description": "verify table \"Organization\" exists",
+        "sql": "SELECT (to_regclass($1)) IS NOT NULL AS \"result\"",
+        "params": [
+          "\"public\".\"Organization\""
+        ]
+      }
+    ]
+  },
+  {
+    "id": "table.OrganizationGroup",
+    "label": "Create table \"OrganizationGroup\"",
+    "summary": "Creates table \"OrganizationGroup\"",
+    "operationClass": "additive",
+    "target": {
+      "id": "postgres",
+      "details": {
+        "schema": "public",
+        "objectType": "table",
+        "name": "OrganizationGroup"
+      }
+    },
+    "precheck": [
+      {
+        "description": "ensure table \"OrganizationGroup\" does not exist",
+        "sql": "SELECT (to_regclass($1)) IS NULL AS \"result\"",
+        "params": [
+          "\"public\".\"OrganizationGroup\""
+        ]
+      }
+    ],
+    "execute": [
+      {
+        "description": "create table \"OrganizationGroup\"",
+        "sql": "CREATE TABLE \"public\".\"OrganizationGroup\" (\n  \"code\" text NOT NULL,\n  \"createdAt\" timestamptz DEFAULT (now()) NOT NULL,\n  \"description\" text,\n  \"id\" text NOT NULL,\n  \"isSystem\" bool DEFAULT false NOT NULL,\n  \"name\" text NOT NULL,\n  \"orgId\" text NOT NULL,\n  \"updatedAt\" timestamptz NOT NULL,\n  PRIMARY KEY (\"id\")\n)",
+        "params": []
+      }
+    ],
+    "postcheck": [
+      {
+        "description": "verify table \"OrganizationGroup\" exists",
+        "sql": "SELECT (to_regclass($1)) IS NOT NULL AS \"result\"",
+        "params": [
+          "\"public\".\"OrganizationGroup\""
+        ]
+      }
+    ]
+  },
+  {
+    "id": "table.OrganizationMember",
+    "label": "Create table \"OrganizationMember\"",
+    "summary": "Creates table \"OrganizationMember\"",
+    "operationClass": "additive",
+    "target": {
+      "id": "postgres",
+      "details": {
+        "schema": "public",
+        "objectType": "table",
+        "name": "OrganizationMember"
+      }
+    },
+    "precheck": [
+      {
+        "description": "ensure table \"OrganizationMember\" does not exist",
+        "sql": "SELECT (to_regclass($1)) IS NULL AS \"result\"",
+        "params": [
+          "\"public\".\"OrganizationMember\""
+        ]
+      }
+    ],
+    "execute": [
+      {
+        "description": "create table \"OrganizationMember\"",
+        "sql": "CREATE TABLE \"public\".\"OrganizationMember\" (\n  \"createdAt\" timestamptz DEFAULT (now()) NOT NULL,\n  \"id\" text NOT NULL,\n  \"invitedEmail\" text,\n  \"orgId\" text NOT NULL,\n  \"status\" text DEFAULT 'ACTIVE' NOT NULL,\n  \"updatedAt\" timestamptz NOT NULL,\n  \"userId\" text NOT NULL,\n  PRIMARY KEY (\"id\")\n)",
+        "params": []
+      }
+    ],
+    "postcheck": [
+      {
+        "description": "verify table \"OrganizationMember\" exists",
+        "sql": "SELECT (to_regclass($1)) IS NOT NULL AS \"result\"",
+        "params": [
+          "\"public\".\"OrganizationMember\""
+        ]
+      }
+    ]
+  },
+  {
+    "id": "table.Permission",
+    "label": "Create table \"Permission\"",
+    "summary": "Creates table \"Permission\"",
+    "operationClass": "additive",
+    "target": {
+      "id": "postgres",
+      "details": {
+        "schema": "public",
+        "objectType": "table",
+        "name": "Permission"
+      }
+    },
+    "precheck": [
+      {
+        "description": "ensure table \"Permission\" does not exist",
+        "sql": "SELECT (to_regclass($1)) IS NULL AS \"result\"",
+        "params": [
+          "\"public\".\"Permission\""
+        ]
+      }
+    ],
+    "execute": [
+      {
+        "description": "create table \"Permission\"",
+        "sql": "CREATE TABLE \"public\".\"Permission\" (\n  \"category\" text NOT NULL,\n  \"createdAt\" timestamptz DEFAULT (now()) NOT NULL,\n  \"description\" text NOT NULL,\n  \"id\" text NOT NULL,\n  \"key\" text NOT NULL,\n  PRIMARY KEY (\"id\")\n)",
+        "params": []
+      }
+    ],
+    "postcheck": [
+      {
+        "description": "verify table \"Permission\" exists",
+        "sql": "SELECT (to_regclass($1)) IS NOT NULL AS \"result\"",
+        "params": [
+          "\"public\".\"Permission\""
+        ]
+      }
+    ]
+  },
+  {
+    "id": "table.UserSession",
+    "label": "Create table \"UserSession\"",
+    "summary": "Creates table \"UserSession\"",
+    "operationClass": "additive",
+    "target": {
+      "id": "postgres",
+      "details": {
+        "schema": "public",
+        "objectType": "table",
+        "name": "UserSession"
+      }
+    },
+    "precheck": [
+      {
+        "description": "ensure table \"UserSession\" does not exist",
+        "sql": "SELECT (to_regclass($1)) IS NULL AS \"result\"",
+        "params": [
+          "\"public\".\"UserSession\""
+        ]
+      }
+    ],
+    "execute": [
+      {
+        "description": "create table \"UserSession\"",
+        "sql": "CREATE TABLE \"public\".\"UserSession\" (\n  \"createdAt\" timestamptz DEFAULT (now()) NOT NULL,\n  \"expiresAt\" timestamptz NOT NULL,\n  \"id\" text NOT NULL,\n  \"ipAddress\" text,\n  \"isRevoked\" bool DEFAULT false NOT NULL,\n  \"refreshTokenHash\" text NOT NULL,\n  \"userAgent\" text,\n  \"userId\" text NOT NULL,\n  PRIMARY KEY (\"id\")\n)",
+        "params": []
+      }
+    ],
+    "postcheck": [
+      {
+        "description": "verify table \"UserSession\" exists",
+        "sql": "SELECT (to_regclass($1)) IS NOT NULL AS \"result\"",
+        "params": [
+          "\"public\".\"UserSession\""
+        ]
+      }
+    ]
+  },
+  {
+    "id": "column.public.User.avatarKey",
+    "label": "Add column \"avatarKey\" to \"User\"",
+    "operationClass": "additive",
+    "target": {
+      "id": "postgres",
+      "details": {
+        "schema": "public",
+        "objectType": "column",
+        "name": "avatarKey",
+        "table": "User"
+      }
+    },
+    "precheck": [
+      {
+        "description": "ensure column \"avatarKey\" is missing",
+        "sql": "SELECT NOT EXISTS (SELECT 1 AS \"one\" FROM \"information_schema\".\"columns\" WHERE (\"table_schema\" = $1 AND \"table_name\" = $2 AND \"column_name\" = $3)) AS \"result\"",
+        "params": [
+          "public",
+          "User",
+          "avatarKey"
+        ]
+      }
+    ],
+    "execute": [
+      {
+        "description": "add column \"avatarKey\"",
+        "sql": "ALTER TABLE \"public\".\"User\" ADD COLUMN \"avatarKey\" text"
+      }
+    ],
+    "postcheck": [
+      {
+        "description": "verify column \"avatarKey\" exists",
+        "sql": "SELECT EXISTS (SELECT 1 AS \"one\" FROM \"information_schema\".\"columns\" WHERE (\"table_schema\" = $1 AND \"table_name\" = $2 AND \"column_name\" = $3)) AS \"result\"",
+        "params": [
+          "public",
+          "User",
+          "avatarKey"
+        ]
+      }
+    ]
+  },
+  {
+    "id": "column.public.User.avatarType",
+    "label": "Add column \"avatarType\" to \"User\"",
+    "operationClass": "additive",
+    "target": {
+      "id": "postgres",
+      "details": {
+        "schema": "public",
+        "objectType": "column",
+        "name": "avatarType",
+        "table": "User"
+      }
+    },
+    "precheck": [
+      {
+        "description": "ensure column \"avatarType\" is missing",
+        "sql": "SELECT NOT EXISTS (SELECT 1 AS \"one\" FROM \"information_schema\".\"columns\" WHERE (\"table_schema\" = $1 AND \"table_name\" = $2 AND \"column_name\" = $3)) AS \"result\"",
+        "params": [
+          "public",
+          "User",
+          "avatarType"
+        ]
+      }
+    ],
+    "execute": [
+      {
+        "description": "add column \"avatarType\"",
+        "sql": "ALTER TABLE \"public\".\"User\" ADD COLUMN \"avatarType\" text DEFAULT 'DEFAULT' NOT NULL"
+      }
+    ],
+    "postcheck": [
+      {
+        "description": "verify column \"avatarType\" exists",
+        "sql": "SELECT EXISTS (SELECT 1 AS \"one\" FROM \"information_schema\".\"columns\" WHERE (\"table_schema\" = $1 AND \"table_name\" = $2 AND \"column_name\" = $3)) AS \"result\"",
+        "params": [
+          "public",
+          "User",
+          "avatarType"
+        ]
+      }
+    ]
+  },
+  {
+    "id": "column.public.User.avatarUrl",
+    "label": "Add column \"avatarUrl\" to \"User\"",
+    "operationClass": "additive",
+    "target": {
+      "id": "postgres",
+      "details": {
+        "schema": "public",
+        "objectType": "column",
+        "name": "avatarUrl",
+        "table": "User"
+      }
+    },
+    "precheck": [
+      {
+        "description": "ensure column \"avatarUrl\" is missing",
+        "sql": "SELECT NOT EXISTS (SELECT 1 AS \"one\" FROM \"information_schema\".\"columns\" WHERE (\"table_schema\" = $1 AND \"table_name\" = $2 AND \"column_name\" = $3)) AS \"result\"",
+        "params": [
+          "public",
+          "User",
+          "avatarUrl"
+        ]
+      }
+    ],
+    "execute": [
+      {
+        "description": "add column \"avatarUrl\"",
+        "sql": "ALTER TABLE \"public\".\"User\" ADD COLUMN \"avatarUrl\" text"
+      }
+    ],
+    "postcheck": [
+      {
+        "description": "verify column \"avatarUrl\" exists",
+        "sql": "SELECT EXISTS (SELECT 1 AS \"one\" FROM \"information_schema\".\"columns\" WHERE (\"table_schema\" = $1 AND \"table_name\" = $2 AND \"column_name\" = $3)) AS \"result\"",
+        "params": [
+          "public",
+          "User",
+          "avatarUrl"
+        ]
+      }
+    ]
+  },
+  {
+    "id": "column.public.User.hashedPassword",
+    "label": "Add column \"hashedPassword\" to \"User\"",
+    "operationClass": "additive",
+    "target": {
+      "id": "postgres",
+      "details": {
+        "schema": "public",
+        "objectType": "column",
+        "name": "hashedPassword",
+        "table": "User"
+      }
+    },
+    "precheck": [
+      {
+        "description": "ensure column \"hashedPassword\" is missing",
+        "sql": "SELECT NOT EXISTS (SELECT 1 AS \"one\" FROM \"information_schema\".\"columns\" WHERE (\"table_schema\" = $1 AND \"table_name\" = $2 AND \"column_name\" = $3)) AS \"result\"",
+        "params": [
+          "public",
+          "User",
+          "hashedPassword"
+        ]
+      }
+    ],
+    "execute": [
+      {
+        "description": "add column \"hashedPassword\"",
+        "sql": "ALTER TABLE \"public\".\"User\" ADD COLUMN \"hashedPassword\" text"
+      }
+    ],
+    "postcheck": [
+      {
+        "description": "verify column \"hashedPassword\" exists",
+        "sql": "SELECT EXISTS (SELECT 1 AS \"one\" FROM \"information_schema\".\"columns\" WHERE (\"table_schema\" = $1 AND \"table_name\" = $2 AND \"column_name\" = $3)) AS \"result\"",
+        "params": [
+          "public",
+          "User",
+          "hashedPassword"
+        ]
+      }
+    ]
+  },
+  {
+    "id": "column.public.User.isEmailVerified",
+    "label": "Add column \"isEmailVerified\" to \"User\"",
+    "operationClass": "additive",
+    "target": {
+      "id": "postgres",
+      "details": {
+        "schema": "public",
+        "objectType": "column",
+        "name": "isEmailVerified",
+        "table": "User"
+      }
+    },
+    "precheck": [
+      {
+        "description": "ensure column \"isEmailVerified\" is missing",
+        "sql": "SELECT NOT EXISTS (SELECT 1 AS \"one\" FROM \"information_schema\".\"columns\" WHERE (\"table_schema\" = $1 AND \"table_name\" = $2 AND \"column_name\" = $3)) AS \"result\"",
+        "params": [
+          "public",
+          "User",
+          "isEmailVerified"
+        ]
+      }
+    ],
+    "execute": [
+      {
+        "description": "add column \"isEmailVerified\"",
+        "sql": "ALTER TABLE \"public\".\"User\" ADD COLUMN \"isEmailVerified\" bool DEFAULT false NOT NULL"
+      }
+    ],
+    "postcheck": [
+      {
+        "description": "verify column \"isEmailVerified\" exists",
+        "sql": "SELECT EXISTS (SELECT 1 AS \"one\" FROM \"information_schema\".\"columns\" WHERE (\"table_schema\" = $1 AND \"table_name\" = $2 AND \"column_name\" = $3)) AS \"result\"",
+        "params": [
+          "public",
+          "User",
+          "isEmailVerified"
+        ]
+      }
+    ]
+  },
+  {
+    "id": "column.public.User.status",
+    "label": "Add column \"status\" to \"User\"",
+    "operationClass": "additive",
+    "target": {
+      "id": "postgres",
+      "details": {
+        "schema": "public",
+        "objectType": "column",
+        "name": "status",
+        "table": "User"
+      }
+    },
+    "precheck": [
+      {
+        "description": "ensure column \"status\" is missing",
+        "sql": "SELECT NOT EXISTS (SELECT 1 AS \"one\" FROM \"information_schema\".\"columns\" WHERE (\"table_schema\" = $1 AND \"table_name\" = $2 AND \"column_name\" = $3)) AS \"result\"",
+        "params": [
+          "public",
+          "User",
+          "status"
+        ]
+      }
+    ],
+    "execute": [
+      {
+        "description": "add column \"status\"",
+        "sql": "ALTER TABLE \"public\".\"User\" ADD COLUMN \"status\" text DEFAULT 'ACTIVE' NOT NULL"
+      }
+    ],
+    "postcheck": [
+      {
+        "description": "verify column \"status\" exists",
+        "sql": "SELECT EXISTS (SELECT 1 AS \"one\" FROM \"information_schema\".\"columns\" WHERE (\"table_schema\" = $1 AND \"table_name\" = $2 AND \"column_name\" = $3)) AS \"result\"",
+        "params": [
+          "public",
+          "User",
+          "status"
+        ]
+      }
+    ]
+  },
+  {
+    "id": "alterType.User.id",
+    "label": "Alter type of \"User\".\"id\" to text",
+    "operationClass": "widening",
+    "target": {
+      "id": "postgres",
+      "details": {
+        "schema": "public",
+        "objectType": "column",
+        "name": "id",
+        "table": "User"
+      }
+    },
+    "precheck": [
+      {
+        "description": "ensure column \"id\" exists",
+        "sql": "SELECT EXISTS (SELECT 1 AS \"one\" FROM \"information_schema\".\"columns\" WHERE (\"table_schema\" = $1 AND \"table_name\" = $2 AND \"column_name\" = $3)) AS \"result\"",
+        "params": [
+          "public",
+          "User",
+          "id"
+        ]
+      }
+    ],
+    "execute": [
+      {
+        "description": "alter type of \"id\"",
+        "sql": "ALTER TABLE \"public\".\"User\" ALTER COLUMN \"id\" TYPE text USING \"id\"::text"
+      }
+    ],
+    "postcheck": [
+      {
+        "description": "verify column \"id\" has type \"text\"",
+        "sql": "SELECT EXISTS (SELECT 1 AS \"one\" FROM \"pg_attribute\" AS \"a\" INNER JOIN \"pg_class\" AS \"c\" ON \"c\".\"oid\" = \"a\".\"attrelid\" INNER JOIN \"pg_namespace\" AS \"n\" ON \"n\".\"oid\" = \"c\".\"relnamespace\" WHERE (\"n\".\"nspname\" = $1 AND \"c\".\"relname\" = $2 AND \"a\".\"attname\" = $3 AND (format_type(\"a\".\"atttypid\", \"a\".\"atttypmod\")) = $4 AND NOT (\"a\".\"attisdropped\"))) AS \"result\"",
+        "params": [
+          "public",
+          "User",
+          "id",
+          "text"
+        ]
+      }
+    ],
+    "meta": {
+      "warning": "TABLE_REWRITE"
+    }
+  },
+  {
+    "id": "unique.GroupPermissionAssignment.GroupPermissionAssignment_groupId_permissionId_key",
+    "label": "Add unique constraint on \"GroupPermissionAssignment\" (groupId, permissionId)",
+    "operationClass": "additive",
+    "target": {
+      "id": "postgres",
+      "details": {
+        "schema": "public",
+        "objectType": "unique",
+        "name": "GroupPermissionAssignment_groupId_permissionId_key",
+        "table": "GroupPermissionAssignment"
+      }
+    },
+    "precheck": [
+      {
+        "description": "ensure constraint \"GroupPermissionAssignment_groupId_permissionId_key\" does not exist",
+        "sql": "SELECT NOT EXISTS (SELECT 1 AS \"one\" FROM \"pg_constraint\" AS \"c\" INNER JOIN \"pg_namespace\" AS \"n\" ON \"n\".\"oid\" = \"c\".\"connamespace\" WHERE (\"c\".\"conname\" = $1 AND \"n\".\"nspname\" = $2 AND \"c\".\"conrelid\" = to_regclass($3))) AS \"result\"",
+        "params": [
+          "GroupPermissionAssignment_groupId_permissionId_key",
+          "public",
+          "\"public\".\"GroupPermissionAssignment\""
+        ]
+      }
+    ],
+    "execute": [
+      {
+        "description": "add unique constraint \"GroupPermissionAssignment_groupId_permissionId_key\"",
+        "sql": "ALTER TABLE \"public\".\"GroupPermissionAssignment\" ADD CONSTRAINT \"GroupPermissionAssignment_groupId_permissionId_key\" UNIQUE (\"groupId\", \"permissionId\")"
+      }
+    ],
+    "postcheck": [
+      {
+        "description": "verify constraint \"GroupPermissionAssignment_groupId_permissionId_key\" exists",
+        "sql": "SELECT EXISTS (SELECT 1 AS \"one\" FROM \"pg_constraint\" AS \"c\" INNER JOIN \"pg_namespace\" AS \"n\" ON \"n\".\"oid\" = \"c\".\"connamespace\" WHERE (\"c\".\"conname\" = $1 AND \"n\".\"nspname\" = $2 AND \"c\".\"conrelid\" = to_regclass($3))) AS \"result\"",
+        "params": [
+          "GroupPermissionAssignment_groupId_permissionId_key",
+          "public",
+          "\"public\".\"GroupPermissionAssignment\""
+        ]
+      }
+    ]
+  },
+  {
+    "id": "unique.IngestKey.IngestKey_keyHash_key",
+    "label": "Add unique constraint on \"IngestKey\" (keyHash)",
+    "operationClass": "additive",
+    "target": {
+      "id": "postgres",
+      "details": {
+        "schema": "public",
+        "objectType": "unique",
+        "name": "IngestKey_keyHash_key",
+        "table": "IngestKey"
+      }
+    },
+    "precheck": [
+      {
+        "description": "ensure constraint \"IngestKey_keyHash_key\" does not exist",
+        "sql": "SELECT NOT EXISTS (SELECT 1 AS \"one\" FROM \"pg_constraint\" AS \"c\" INNER JOIN \"pg_namespace\" AS \"n\" ON \"n\".\"oid\" = \"c\".\"connamespace\" WHERE (\"c\".\"conname\" = $1 AND \"n\".\"nspname\" = $2 AND \"c\".\"conrelid\" = to_regclass($3))) AS \"result\"",
+        "params": [
+          "IngestKey_keyHash_key",
+          "public",
+          "\"public\".\"IngestKey\""
+        ]
+      }
+    ],
+    "execute": [
+      {
+        "description": "add unique constraint \"IngestKey_keyHash_key\"",
+        "sql": "ALTER TABLE \"public\".\"IngestKey\" ADD CONSTRAINT \"IngestKey_keyHash_key\" UNIQUE (\"keyHash\")"
+      }
+    ],
+    "postcheck": [
+      {
+        "description": "verify constraint \"IngestKey_keyHash_key\" exists",
+        "sql": "SELECT EXISTS (SELECT 1 AS \"one\" FROM \"pg_constraint\" AS \"c\" INNER JOIN \"pg_namespace\" AS \"n\" ON \"n\".\"oid\" = \"c\".\"connamespace\" WHERE (\"c\".\"conname\" = $1 AND \"n\".\"nspname\" = $2 AND \"c\".\"conrelid\" = to_regclass($3))) AS \"result\"",
+        "params": [
+          "IngestKey_keyHash_key",
+          "public",
+          "\"public\".\"IngestKey\""
+        ]
+      }
+    ]
+  },
+  {
+    "id": "unique.MemberGroupAssignment.MemberGroupAssignment_memberId_groupId_key",
+    "label": "Add unique constraint on \"MemberGroupAssignment\" (memberId, groupId)",
+    "operationClass": "additive",
+    "target": {
+      "id": "postgres",
+      "details": {
+        "schema": "public",
+        "objectType": "unique",
+        "name": "MemberGroupAssignment_memberId_groupId_key",
+        "table": "MemberGroupAssignment"
+      }
+    },
+    "precheck": [
+      {
+        "description": "ensure constraint \"MemberGroupAssignment_memberId_groupId_key\" does not exist",
+        "sql": "SELECT NOT EXISTS (SELECT 1 AS \"one\" FROM \"pg_constraint\" AS \"c\" INNER JOIN \"pg_namespace\" AS \"n\" ON \"n\".\"oid\" = \"c\".\"connamespace\" WHERE (\"c\".\"conname\" = $1 AND \"n\".\"nspname\" = $2 AND \"c\".\"conrelid\" = to_regclass($3))) AS \"result\"",
+        "params": [
+          "MemberGroupAssignment_memberId_groupId_key",
+          "public",
+          "\"public\".\"MemberGroupAssignment\""
+        ]
+      }
+    ],
+    "execute": [
+      {
+        "description": "add unique constraint \"MemberGroupAssignment_memberId_groupId_key\"",
+        "sql": "ALTER TABLE \"public\".\"MemberGroupAssignment\" ADD CONSTRAINT \"MemberGroupAssignment_memberId_groupId_key\" UNIQUE (\"memberId\", \"groupId\")"
+      }
+    ],
+    "postcheck": [
+      {
+        "description": "verify constraint \"MemberGroupAssignment_memberId_groupId_key\" exists",
+        "sql": "SELECT EXISTS (SELECT 1 AS \"one\" FROM \"pg_constraint\" AS \"c\" INNER JOIN \"pg_namespace\" AS \"n\" ON \"n\".\"oid\" = \"c\".\"connamespace\" WHERE (\"c\".\"conname\" = $1 AND \"n\".\"nspname\" = $2 AND \"c\".\"conrelid\" = to_regclass($3))) AS \"result\"",
+        "params": [
+          "MemberGroupAssignment_memberId_groupId_key",
+          "public",
+          "\"public\".\"MemberGroupAssignment\""
+        ]
+      }
+    ]
+  },
+  {
+    "id": "unique.OAuthAccount.OAuthAccount_provider_providerAccountId_key",
+    "label": "Add unique constraint on \"OAuthAccount\" (provider, providerAccountId)",
+    "operationClass": "additive",
+    "target": {
+      "id": "postgres",
+      "details": {
+        "schema": "public",
+        "objectType": "unique",
+        "name": "OAuthAccount_provider_providerAccountId_key",
+        "table": "OAuthAccount"
+      }
+    },
+    "precheck": [
+      {
+        "description": "ensure constraint \"OAuthAccount_provider_providerAccountId_key\" does not exist",
+        "sql": "SELECT NOT EXISTS (SELECT 1 AS \"one\" FROM \"pg_constraint\" AS \"c\" INNER JOIN \"pg_namespace\" AS \"n\" ON \"n\".\"oid\" = \"c\".\"connamespace\" WHERE (\"c\".\"conname\" = $1 AND \"n\".\"nspname\" = $2 AND \"c\".\"conrelid\" = to_regclass($3))) AS \"result\"",
+        "params": [
+          "OAuthAccount_provider_providerAccountId_key",
+          "public",
+          "\"public\".\"OAuthAccount\""
+        ]
+      }
+    ],
+    "execute": [
+      {
+        "description": "add unique constraint \"OAuthAccount_provider_providerAccountId_key\"",
+        "sql": "ALTER TABLE \"public\".\"OAuthAccount\" ADD CONSTRAINT \"OAuthAccount_provider_providerAccountId_key\" UNIQUE (\"provider\", \"providerAccountId\")"
+      }
+    ],
+    "postcheck": [
+      {
+        "description": "verify constraint \"OAuthAccount_provider_providerAccountId_key\" exists",
+        "sql": "SELECT EXISTS (SELECT 1 AS \"one\" FROM \"pg_constraint\" AS \"c\" INNER JOIN \"pg_namespace\" AS \"n\" ON \"n\".\"oid\" = \"c\".\"connamespace\" WHERE (\"c\".\"conname\" = $1 AND \"n\".\"nspname\" = $2 AND \"c\".\"conrelid\" = to_regclass($3))) AS \"result\"",
+        "params": [
+          "OAuthAccount_provider_providerAccountId_key",
+          "public",
+          "\"public\".\"OAuthAccount\""
+        ]
+      }
+    ]
+  },
+  {
+    "id": "unique.OAuthAccount.OAuthAccount_userId_provider_key",
+    "label": "Add unique constraint on \"OAuthAccount\" (userId, provider)",
+    "operationClass": "additive",
+    "target": {
+      "id": "postgres",
+      "details": {
+        "schema": "public",
+        "objectType": "unique",
+        "name": "OAuthAccount_userId_provider_key",
+        "table": "OAuthAccount"
+      }
+    },
+    "precheck": [
+      {
+        "description": "ensure constraint \"OAuthAccount_userId_provider_key\" does not exist",
+        "sql": "SELECT NOT EXISTS (SELECT 1 AS \"one\" FROM \"pg_constraint\" AS \"c\" INNER JOIN \"pg_namespace\" AS \"n\" ON \"n\".\"oid\" = \"c\".\"connamespace\" WHERE (\"c\".\"conname\" = $1 AND \"n\".\"nspname\" = $2 AND \"c\".\"conrelid\" = to_regclass($3))) AS \"result\"",
+        "params": [
+          "OAuthAccount_userId_provider_key",
+          "public",
+          "\"public\".\"OAuthAccount\""
+        ]
+      }
+    ],
+    "execute": [
+      {
+        "description": "add unique constraint \"OAuthAccount_userId_provider_key\"",
+        "sql": "ALTER TABLE \"public\".\"OAuthAccount\" ADD CONSTRAINT \"OAuthAccount_userId_provider_key\" UNIQUE (\"userId\", \"provider\")"
+      }
+    ],
+    "postcheck": [
+      {
+        "description": "verify constraint \"OAuthAccount_userId_provider_key\" exists",
+        "sql": "SELECT EXISTS (SELECT 1 AS \"one\" FROM \"pg_constraint\" AS \"c\" INNER JOIN \"pg_namespace\" AS \"n\" ON \"n\".\"oid\" = \"c\".\"connamespace\" WHERE (\"c\".\"conname\" = $1 AND \"n\".\"nspname\" = $2 AND \"c\".\"conrelid\" = to_regclass($3))) AS \"result\"",
+        "params": [
+          "OAuthAccount_userId_provider_key",
+          "public",
+          "\"public\".\"OAuthAccount\""
+        ]
+      }
+    ]
+  },
+  {
+    "id": "unique.Organization.Organization_slug_key",
+    "label": "Add unique constraint on \"Organization\" (slug)",
+    "operationClass": "additive",
+    "target": {
+      "id": "postgres",
+      "details": {
+        "schema": "public",
+        "objectType": "unique",
+        "name": "Organization_slug_key",
+        "table": "Organization"
+      }
+    },
+    "precheck": [
+      {
+        "description": "ensure constraint \"Organization_slug_key\" does not exist",
+        "sql": "SELECT NOT EXISTS (SELECT 1 AS \"one\" FROM \"pg_constraint\" AS \"c\" INNER JOIN \"pg_namespace\" AS \"n\" ON \"n\".\"oid\" = \"c\".\"connamespace\" WHERE (\"c\".\"conname\" = $1 AND \"n\".\"nspname\" = $2 AND \"c\".\"conrelid\" = to_regclass($3))) AS \"result\"",
+        "params": [
+          "Organization_slug_key",
+          "public",
+          "\"public\".\"Organization\""
+        ]
+      }
+    ],
+    "execute": [
+      {
+        "description": "add unique constraint \"Organization_slug_key\"",
+        "sql": "ALTER TABLE \"public\".\"Organization\" ADD CONSTRAINT \"Organization_slug_key\" UNIQUE (\"slug\")"
+      }
+    ],
+    "postcheck": [
+      {
+        "description": "verify constraint \"Organization_slug_key\" exists",
+        "sql": "SELECT EXISTS (SELECT 1 AS \"one\" FROM \"pg_constraint\" AS \"c\" INNER JOIN \"pg_namespace\" AS \"n\" ON \"n\".\"oid\" = \"c\".\"connamespace\" WHERE (\"c\".\"conname\" = $1 AND \"n\".\"nspname\" = $2 AND \"c\".\"conrelid\" = to_regclass($3))) AS \"result\"",
+        "params": [
+          "Organization_slug_key",
+          "public",
+          "\"public\".\"Organization\""
+        ]
+      }
+    ]
+  },
+  {
+    "id": "unique.OrganizationGroup.OrganizationGroup_orgId_code_key",
+    "label": "Add unique constraint on \"OrganizationGroup\" (orgId, code)",
+    "operationClass": "additive",
+    "target": {
+      "id": "postgres",
+      "details": {
+        "schema": "public",
+        "objectType": "unique",
+        "name": "OrganizationGroup_orgId_code_key",
+        "table": "OrganizationGroup"
+      }
+    },
+    "precheck": [
+      {
+        "description": "ensure constraint \"OrganizationGroup_orgId_code_key\" does not exist",
+        "sql": "SELECT NOT EXISTS (SELECT 1 AS \"one\" FROM \"pg_constraint\" AS \"c\" INNER JOIN \"pg_namespace\" AS \"n\" ON \"n\".\"oid\" = \"c\".\"connamespace\" WHERE (\"c\".\"conname\" = $1 AND \"n\".\"nspname\" = $2 AND \"c\".\"conrelid\" = to_regclass($3))) AS \"result\"",
+        "params": [
+          "OrganizationGroup_orgId_code_key",
+          "public",
+          "\"public\".\"OrganizationGroup\""
+        ]
+      }
+    ],
+    "execute": [
+      {
+        "description": "add unique constraint \"OrganizationGroup_orgId_code_key\"",
+        "sql": "ALTER TABLE \"public\".\"OrganizationGroup\" ADD CONSTRAINT \"OrganizationGroup_orgId_code_key\" UNIQUE (\"orgId\", \"code\")"
+      }
+    ],
+    "postcheck": [
+      {
+        "description": "verify constraint \"OrganizationGroup_orgId_code_key\" exists",
+        "sql": "SELECT EXISTS (SELECT 1 AS \"one\" FROM \"pg_constraint\" AS \"c\" INNER JOIN \"pg_namespace\" AS \"n\" ON \"n\".\"oid\" = \"c\".\"connamespace\" WHERE (\"c\".\"conname\" = $1 AND \"n\".\"nspname\" = $2 AND \"c\".\"conrelid\" = to_regclass($3))) AS \"result\"",
+        "params": [
+          "OrganizationGroup_orgId_code_key",
+          "public",
+          "\"public\".\"OrganizationGroup\""
+        ]
+      }
+    ]
+  },
+  {
+    "id": "unique.OrganizationMember.OrganizationMember_orgId_userId_key",
+    "label": "Add unique constraint on \"OrganizationMember\" (orgId, userId)",
+    "operationClass": "additive",
+    "target": {
+      "id": "postgres",
+      "details": {
+        "schema": "public",
+        "objectType": "unique",
+        "name": "OrganizationMember_orgId_userId_key",
+        "table": "OrganizationMember"
+      }
+    },
+    "precheck": [
+      {
+        "description": "ensure constraint \"OrganizationMember_orgId_userId_key\" does not exist",
+        "sql": "SELECT NOT EXISTS (SELECT 1 AS \"one\" FROM \"pg_constraint\" AS \"c\" INNER JOIN \"pg_namespace\" AS \"n\" ON \"n\".\"oid\" = \"c\".\"connamespace\" WHERE (\"c\".\"conname\" = $1 AND \"n\".\"nspname\" = $2 AND \"c\".\"conrelid\" = to_regclass($3))) AS \"result\"",
+        "params": [
+          "OrganizationMember_orgId_userId_key",
+          "public",
+          "\"public\".\"OrganizationMember\""
+        ]
+      }
+    ],
+    "execute": [
+      {
+        "description": "add unique constraint \"OrganizationMember_orgId_userId_key\"",
+        "sql": "ALTER TABLE \"public\".\"OrganizationMember\" ADD CONSTRAINT \"OrganizationMember_orgId_userId_key\" UNIQUE (\"orgId\", \"userId\")"
+      }
+    ],
+    "postcheck": [
+      {
+        "description": "verify constraint \"OrganizationMember_orgId_userId_key\" exists",
+        "sql": "SELECT EXISTS (SELECT 1 AS \"one\" FROM \"pg_constraint\" AS \"c\" INNER JOIN \"pg_namespace\" AS \"n\" ON \"n\".\"oid\" = \"c\".\"connamespace\" WHERE (\"c\".\"conname\" = $1 AND \"n\".\"nspname\" = $2 AND \"c\".\"conrelid\" = to_regclass($3))) AS \"result\"",
+        "params": [
+          "OrganizationMember_orgId_userId_key",
+          "public",
+          "\"public\".\"OrganizationMember\""
+        ]
+      }
+    ]
+  },
+  {
+    "id": "unique.Permission.Permission_key_key",
+    "label": "Add unique constraint on \"Permission\" (key)",
+    "operationClass": "additive",
+    "target": {
+      "id": "postgres",
+      "details": {
+        "schema": "public",
+        "objectType": "unique",
+        "name": "Permission_key_key",
+        "table": "Permission"
+      }
+    },
+    "precheck": [
+      {
+        "description": "ensure constraint \"Permission_key_key\" does not exist",
+        "sql": "SELECT NOT EXISTS (SELECT 1 AS \"one\" FROM \"pg_constraint\" AS \"c\" INNER JOIN \"pg_namespace\" AS \"n\" ON \"n\".\"oid\" = \"c\".\"connamespace\" WHERE (\"c\".\"conname\" = $1 AND \"n\".\"nspname\" = $2 AND \"c\".\"conrelid\" = to_regclass($3))) AS \"result\"",
+        "params": [
+          "Permission_key_key",
+          "public",
+          "\"public\".\"Permission\""
+        ]
+      }
+    ],
+    "execute": [
+      {
+        "description": "add unique constraint \"Permission_key_key\"",
+        "sql": "ALTER TABLE \"public\".\"Permission\" ADD CONSTRAINT \"Permission_key_key\" UNIQUE (\"key\")"
+      }
+    ],
+    "postcheck": [
+      {
+        "description": "verify constraint \"Permission_key_key\" exists",
+        "sql": "SELECT EXISTS (SELECT 1 AS \"one\" FROM \"pg_constraint\" AS \"c\" INNER JOIN \"pg_namespace\" AS \"n\" ON \"n\".\"oid\" = \"c\".\"connamespace\" WHERE (\"c\".\"conname\" = $1 AND \"n\".\"nspname\" = $2 AND \"c\".\"conrelid\" = to_regclass($3))) AS \"result\"",
+        "params": [
+          "Permission_key_key",
+          "public",
+          "\"public\".\"Permission\""
+        ]
+      }
+    ]
+  },
+  {
+    "id": "unique.User.User_username_key",
+    "label": "Add unique constraint on \"User\" (username)",
+    "operationClass": "additive",
+    "target": {
+      "id": "postgres",
+      "details": {
+        "schema": "public",
+        "objectType": "unique",
+        "name": "User_username_key",
+        "table": "User"
+      }
+    },
+    "precheck": [
+      {
+        "description": "ensure constraint \"User_username_key\" does not exist",
+        "sql": "SELECT NOT EXISTS (SELECT 1 AS \"one\" FROM \"pg_constraint\" AS \"c\" INNER JOIN \"pg_namespace\" AS \"n\" ON \"n\".\"oid\" = \"c\".\"connamespace\" WHERE (\"c\".\"conname\" = $1 AND \"n\".\"nspname\" = $2 AND \"c\".\"conrelid\" = to_regclass($3))) AS \"result\"",
+        "params": [
+          "User_username_key",
+          "public",
+          "\"public\".\"User\""
+        ]
+      }
+    ],
+    "execute": [
+      {
+        "description": "add unique constraint \"User_username_key\"",
+        "sql": "ALTER TABLE \"public\".\"User\" ADD CONSTRAINT \"User_username_key\" UNIQUE (\"username\")"
+      }
+    ],
+    "postcheck": [
+      {
+        "description": "verify constraint \"User_username_key\" exists",
+        "sql": "SELECT EXISTS (SELECT 1 AS \"one\" FROM \"pg_constraint\" AS \"c\" INNER JOIN \"pg_namespace\" AS \"n\" ON \"n\".\"oid\" = \"c\".\"connamespace\" WHERE (\"c\".\"conname\" = $1 AND \"n\".\"nspname\" = $2 AND \"c\".\"conrelid\" = to_regclass($3))) AS \"result\"",
+        "params": [
+          "User_username_key",
+          "public",
+          "\"public\".\"User\""
+        ]
+      }
+    ]
+  },
+  {
+    "id": "unique.UserSession.UserSession_refreshTokenHash_key",
+    "label": "Add unique constraint on \"UserSession\" (refreshTokenHash)",
+    "operationClass": "additive",
+    "target": {
+      "id": "postgres",
+      "details": {
+        "schema": "public",
+        "objectType": "unique",
+        "name": "UserSession_refreshTokenHash_key",
+        "table": "UserSession"
+      }
+    },
+    "precheck": [
+      {
+        "description": "ensure constraint \"UserSession_refreshTokenHash_key\" does not exist",
+        "sql": "SELECT NOT EXISTS (SELECT 1 AS \"one\" FROM \"pg_constraint\" AS \"c\" INNER JOIN \"pg_namespace\" AS \"n\" ON \"n\".\"oid\" = \"c\".\"connamespace\" WHERE (\"c\".\"conname\" = $1 AND \"n\".\"nspname\" = $2 AND \"c\".\"conrelid\" = to_regclass($3))) AS \"result\"",
+        "params": [
+          "UserSession_refreshTokenHash_key",
+          "public",
+          "\"public\".\"UserSession\""
+        ]
+      }
+    ],
+    "execute": [
+      {
+        "description": "add unique constraint \"UserSession_refreshTokenHash_key\"",
+        "sql": "ALTER TABLE \"public\".\"UserSession\" ADD CONSTRAINT \"UserSession_refreshTokenHash_key\" UNIQUE (\"refreshTokenHash\")"
+      }
+    ],
+    "postcheck": [
+      {
+        "description": "verify constraint \"UserSession_refreshTokenHash_key\" exists",
+        "sql": "SELECT EXISTS (SELECT 1 AS \"one\" FROM \"pg_constraint\" AS \"c\" INNER JOIN \"pg_namespace\" AS \"n\" ON \"n\".\"oid\" = \"c\".\"connamespace\" WHERE (\"c\".\"conname\" = $1 AND \"n\".\"nspname\" = $2 AND \"c\".\"conrelid\" = to_regclass($3))) AS \"result\"",
+        "params": [
+          "UserSession_refreshTokenHash_key",
+          "public",
+          "\"public\".\"UserSession\""
+        ]
+      }
+    ]
+  },
+  {
+    "id": "index.GroupPermissionAssignment.GroupPermissionAssignment_groupId_idx_e2fb5578",
+    "label": "Create index \"GroupPermissionAssignment_groupId_idx_e2fb5578\" on \"GroupPermissionAssignment\"",
+    "operationClass": "additive",
+    "target": {
+      "id": "postgres",
+      "details": {
+        "schema": "public",
+        "objectType": "index",
+        "name": "GroupPermissionAssignment_groupId_idx_e2fb5578",
+        "table": "GroupPermissionAssignment"
+      }
+    },
+    "precheck": [
+      {
+        "description": "ensure index \"GroupPermissionAssignment_groupId_idx_e2fb5578\" does not exist",
+        "sql": "SELECT (to_regclass($1)) IS NULL AS \"result\"",
+        "params": [
+          "\"public\".\"GroupPermissionAssignment_groupId_idx_e2fb5578\""
+        ]
+      }
+    ],
+    "execute": [
+      {
+        "description": "create index \"GroupPermissionAssignment_groupId_idx_e2fb5578\"",
+        "sql": "CREATE INDEX \"GroupPermissionAssignment_groupId_idx_e2fb5578\" ON \"public\".\"GroupPermissionAssignment\" (\"groupId\")",
+        "params": []
+      }
+    ],
+    "postcheck": [
+      {
+        "description": "verify index \"GroupPermissionAssignment_groupId_idx_e2fb5578\" exists",
+        "sql": "SELECT (to_regclass($1)) IS NOT NULL AS \"result\"",
+        "params": [
+          "\"public\".\"GroupPermissionAssignment_groupId_idx_e2fb5578\""
+        ]
+      }
+    ]
+  },
+  {
+    "id": "index.GroupPermissionAssignment.GroupPermissionAssignment_permissionId_idx_f46fcdf5",
+    "label": "Create index \"GroupPermissionAssignment_permissionId_idx_f46fcdf5\" on \"GroupPermissionAssignment\"",
+    "operationClass": "additive",
+    "target": {
+      "id": "postgres",
+      "details": {
+        "schema": "public",
+        "objectType": "index",
+        "name": "GroupPermissionAssignment_permissionId_idx_f46fcdf5",
+        "table": "GroupPermissionAssignment"
+      }
+    },
+    "precheck": [
+      {
+        "description": "ensure index \"GroupPermissionAssignment_permissionId_idx_f46fcdf5\" does not exist",
+        "sql": "SELECT (to_regclass($1)) IS NULL AS \"result\"",
+        "params": [
+          "\"public\".\"GroupPermissionAssignment_permissionId_idx_f46fcdf5\""
+        ]
+      }
+    ],
+    "execute": [
+      {
+        "description": "create index \"GroupPermissionAssignment_permissionId_idx_f46fcdf5\"",
+        "sql": "CREATE INDEX \"GroupPermissionAssignment_permissionId_idx_f46fcdf5\" ON \"public\".\"GroupPermissionAssignment\" (\"permissionId\")",
+        "params": []
+      }
+    ],
+    "postcheck": [
+      {
+        "description": "verify index \"GroupPermissionAssignment_permissionId_idx_f46fcdf5\" exists",
+        "sql": "SELECT (to_regclass($1)) IS NOT NULL AS \"result\"",
+        "params": [
+          "\"public\".\"GroupPermissionAssignment_permissionId_idx_f46fcdf5\""
+        ]
+      }
+    ]
+  },
+  {
+    "id": "index.IngestKey.IngestKey_orgId_idx_c5e5aabe",
+    "label": "Create index \"IngestKey_orgId_idx_c5e5aabe\" on \"IngestKey\"",
+    "operationClass": "additive",
+    "target": {
+      "id": "postgres",
+      "details": {
+        "schema": "public",
+        "objectType": "index",
+        "name": "IngestKey_orgId_idx_c5e5aabe",
+        "table": "IngestKey"
+      }
+    },
+    "precheck": [
+      {
+        "description": "ensure index \"IngestKey_orgId_idx_c5e5aabe\" does not exist",
+        "sql": "SELECT (to_regclass($1)) IS NULL AS \"result\"",
+        "params": [
+          "\"public\".\"IngestKey_orgId_idx_c5e5aabe\""
+        ]
+      }
+    ],
+    "execute": [
+      {
+        "description": "create index \"IngestKey_orgId_idx_c5e5aabe\"",
+        "sql": "CREATE INDEX \"IngestKey_orgId_idx_c5e5aabe\" ON \"public\".\"IngestKey\" (\"orgId\")",
+        "params": []
+      }
+    ],
+    "postcheck": [
+      {
+        "description": "verify index \"IngestKey_orgId_idx_c5e5aabe\" exists",
+        "sql": "SELECT (to_regclass($1)) IS NOT NULL AS \"result\"",
+        "params": [
+          "\"public\".\"IngestKey_orgId_idx_c5e5aabe\""
+        ]
+      }
+    ]
+  },
+  {
+    "id": "index.MemberGroupAssignment.MemberGroupAssignment_groupId_idx_e2fb5578",
+    "label": "Create index \"MemberGroupAssignment_groupId_idx_e2fb5578\" on \"MemberGroupAssignment\"",
+    "operationClass": "additive",
+    "target": {
+      "id": "postgres",
+      "details": {
+        "schema": "public",
+        "objectType": "index",
+        "name": "MemberGroupAssignment_groupId_idx_e2fb5578",
+        "table": "MemberGroupAssignment"
+      }
+    },
+    "precheck": [
+      {
+        "description": "ensure index \"MemberGroupAssignment_groupId_idx_e2fb5578\" does not exist",
+        "sql": "SELECT (to_regclass($1)) IS NULL AS \"result\"",
+        "params": [
+          "\"public\".\"MemberGroupAssignment_groupId_idx_e2fb5578\""
+        ]
+      }
+    ],
+    "execute": [
+      {
+        "description": "create index \"MemberGroupAssignment_groupId_idx_e2fb5578\"",
+        "sql": "CREATE INDEX \"MemberGroupAssignment_groupId_idx_e2fb5578\" ON \"public\".\"MemberGroupAssignment\" (\"groupId\")",
+        "params": []
+      }
+    ],
+    "postcheck": [
+      {
+        "description": "verify index \"MemberGroupAssignment_groupId_idx_e2fb5578\" exists",
+        "sql": "SELECT (to_regclass($1)) IS NOT NULL AS \"result\"",
+        "params": [
+          "\"public\".\"MemberGroupAssignment_groupId_idx_e2fb5578\""
+        ]
+      }
+    ]
+  },
+  {
+    "id": "index.MemberGroupAssignment.MemberGroupAssignment_memberId_idx_76b3c263",
+    "label": "Create index \"MemberGroupAssignment_memberId_idx_76b3c263\" on \"MemberGroupAssignment\"",
+    "operationClass": "additive",
+    "target": {
+      "id": "postgres",
+      "details": {
+        "schema": "public",
+        "objectType": "index",
+        "name": "MemberGroupAssignment_memberId_idx_76b3c263",
+        "table": "MemberGroupAssignment"
+      }
+    },
+    "precheck": [
+      {
+        "description": "ensure index \"MemberGroupAssignment_memberId_idx_76b3c263\" does not exist",
+        "sql": "SELECT (to_regclass($1)) IS NULL AS \"result\"",
+        "params": [
+          "\"public\".\"MemberGroupAssignment_memberId_idx_76b3c263\""
+        ]
+      }
+    ],
+    "execute": [
+      {
+        "description": "create index \"MemberGroupAssignment_memberId_idx_76b3c263\"",
+        "sql": "CREATE INDEX \"MemberGroupAssignment_memberId_idx_76b3c263\" ON \"public\".\"MemberGroupAssignment\" (\"memberId\")",
+        "params": []
+      }
+    ],
+    "postcheck": [
+      {
+        "description": "verify index \"MemberGroupAssignment_memberId_idx_76b3c263\" exists",
+        "sql": "SELECT (to_regclass($1)) IS NOT NULL AS \"result\"",
+        "params": [
+          "\"public\".\"MemberGroupAssignment_memberId_idx_76b3c263\""
+        ]
+      }
+    ]
+  },
+  {
+    "id": "index.OAuthAccount.OAuthAccount_userId_idx_a489d58a",
+    "label": "Create index \"OAuthAccount_userId_idx_a489d58a\" on \"OAuthAccount\"",
+    "operationClass": "additive",
+    "target": {
+      "id": "postgres",
+      "details": {
+        "schema": "public",
+        "objectType": "index",
+        "name": "OAuthAccount_userId_idx_a489d58a",
+        "table": "OAuthAccount"
+      }
+    },
+    "precheck": [
+      {
+        "description": "ensure index \"OAuthAccount_userId_idx_a489d58a\" does not exist",
+        "sql": "SELECT (to_regclass($1)) IS NULL AS \"result\"",
+        "params": [
+          "\"public\".\"OAuthAccount_userId_idx_a489d58a\""
+        ]
+      }
+    ],
+    "execute": [
+      {
+        "description": "create index \"OAuthAccount_userId_idx_a489d58a\"",
+        "sql": "CREATE INDEX \"OAuthAccount_userId_idx_a489d58a\" ON \"public\".\"OAuthAccount\" (\"userId\")",
+        "params": []
+      }
+    ],
+    "postcheck": [
+      {
+        "description": "verify index \"OAuthAccount_userId_idx_a489d58a\" exists",
+        "sql": "SELECT (to_regclass($1)) IS NOT NULL AS \"result\"",
+        "params": [
+          "\"public\".\"OAuthAccount_userId_idx_a489d58a\""
+        ]
+      }
+    ]
+  },
+  {
+    "id": "index.Organization.Organization_createdById_idx_8bf640ed",
+    "label": "Create index \"Organization_createdById_idx_8bf640ed\" on \"Organization\"",
+    "operationClass": "additive",
+    "target": {
+      "id": "postgres",
+      "details": {
+        "schema": "public",
+        "objectType": "index",
+        "name": "Organization_createdById_idx_8bf640ed",
+        "table": "Organization"
+      }
+    },
+    "precheck": [
+      {
+        "description": "ensure index \"Organization_createdById_idx_8bf640ed\" does not exist",
+        "sql": "SELECT (to_regclass($1)) IS NULL AS \"result\"",
+        "params": [
+          "\"public\".\"Organization_createdById_idx_8bf640ed\""
+        ]
+      }
+    ],
+    "execute": [
+      {
+        "description": "create index \"Organization_createdById_idx_8bf640ed\"",
+        "sql": "CREATE INDEX \"Organization_createdById_idx_8bf640ed\" ON \"public\".\"Organization\" (\"createdById\")",
+        "params": []
+      }
+    ],
+    "postcheck": [
+      {
+        "description": "verify index \"Organization_createdById_idx_8bf640ed\" exists",
+        "sql": "SELECT (to_regclass($1)) IS NOT NULL AS \"result\"",
+        "params": [
+          "\"public\".\"Organization_createdById_idx_8bf640ed\""
+        ]
+      }
+    ]
+  },
+  {
+    "id": "index.OrganizationGroup.OrganizationGroup_orgId_idx_c5e5aabe",
+    "label": "Create index \"OrganizationGroup_orgId_idx_c5e5aabe\" on \"OrganizationGroup\"",
+    "operationClass": "additive",
+    "target": {
+      "id": "postgres",
+      "details": {
+        "schema": "public",
+        "objectType": "index",
+        "name": "OrganizationGroup_orgId_idx_c5e5aabe",
+        "table": "OrganizationGroup"
+      }
+    },
+    "precheck": [
+      {
+        "description": "ensure index \"OrganizationGroup_orgId_idx_c5e5aabe\" does not exist",
+        "sql": "SELECT (to_regclass($1)) IS NULL AS \"result\"",
+        "params": [
+          "\"public\".\"OrganizationGroup_orgId_idx_c5e5aabe\""
+        ]
+      }
+    ],
+    "execute": [
+      {
+        "description": "create index \"OrganizationGroup_orgId_idx_c5e5aabe\"",
+        "sql": "CREATE INDEX \"OrganizationGroup_orgId_idx_c5e5aabe\" ON \"public\".\"OrganizationGroup\" (\"orgId\")",
+        "params": []
+      }
+    ],
+    "postcheck": [
+      {
+        "description": "verify index \"OrganizationGroup_orgId_idx_c5e5aabe\" exists",
+        "sql": "SELECT (to_regclass($1)) IS NOT NULL AS \"result\"",
+        "params": [
+          "\"public\".\"OrganizationGroup_orgId_idx_c5e5aabe\""
+        ]
+      }
+    ]
+  },
+  {
+    "id": "index.OrganizationMember.OrganizationMember_orgId_idx_c5e5aabe",
+    "label": "Create index \"OrganizationMember_orgId_idx_c5e5aabe\" on \"OrganizationMember\"",
+    "operationClass": "additive",
+    "target": {
+      "id": "postgres",
+      "details": {
+        "schema": "public",
+        "objectType": "index",
+        "name": "OrganizationMember_orgId_idx_c5e5aabe",
+        "table": "OrganizationMember"
+      }
+    },
+    "precheck": [
+      {
+        "description": "ensure index \"OrganizationMember_orgId_idx_c5e5aabe\" does not exist",
+        "sql": "SELECT (to_regclass($1)) IS NULL AS \"result\"",
+        "params": [
+          "\"public\".\"OrganizationMember_orgId_idx_c5e5aabe\""
+        ]
+      }
+    ],
+    "execute": [
+      {
+        "description": "create index \"OrganizationMember_orgId_idx_c5e5aabe\"",
+        "sql": "CREATE INDEX \"OrganizationMember_orgId_idx_c5e5aabe\" ON \"public\".\"OrganizationMember\" (\"orgId\")",
+        "params": []
+      }
+    ],
+    "postcheck": [
+      {
+        "description": "verify index \"OrganizationMember_orgId_idx_c5e5aabe\" exists",
+        "sql": "SELECT (to_regclass($1)) IS NOT NULL AS \"result\"",
+        "params": [
+          "\"public\".\"OrganizationMember_orgId_idx_c5e5aabe\""
+        ]
+      }
+    ]
+  },
+  {
+    "id": "index.OrganizationMember.OrganizationMember_userId_idx_a489d58a",
+    "label": "Create index \"OrganizationMember_userId_idx_a489d58a\" on \"OrganizationMember\"",
+    "operationClass": "additive",
+    "target": {
+      "id": "postgres",
+      "details": {
+        "schema": "public",
+        "objectType": "index",
+        "name": "OrganizationMember_userId_idx_a489d58a",
+        "table": "OrganizationMember"
+      }
+    },
+    "precheck": [
+      {
+        "description": "ensure index \"OrganizationMember_userId_idx_a489d58a\" does not exist",
+        "sql": "SELECT (to_regclass($1)) IS NULL AS \"result\"",
+        "params": [
+          "\"public\".\"OrganizationMember_userId_idx_a489d58a\""
+        ]
+      }
+    ],
+    "execute": [
+      {
+        "description": "create index \"OrganizationMember_userId_idx_a489d58a\"",
+        "sql": "CREATE INDEX \"OrganizationMember_userId_idx_a489d58a\" ON \"public\".\"OrganizationMember\" (\"userId\")",
+        "params": []
+      }
+    ],
+    "postcheck": [
+      {
+        "description": "verify index \"OrganizationMember_userId_idx_a489d58a\" exists",
+        "sql": "SELECT (to_regclass($1)) IS NOT NULL AS \"result\"",
+        "params": [
+          "\"public\".\"OrganizationMember_userId_idx_a489d58a\""
+        ]
+      }
+    ]
+  },
+  {
+    "id": "index.UserSession.UserSession_userId_idx_a489d58a",
+    "label": "Create index \"UserSession_userId_idx_a489d58a\" on \"UserSession\"",
+    "operationClass": "additive",
+    "target": {
+      "id": "postgres",
+      "details": {
+        "schema": "public",
+        "objectType": "index",
+        "name": "UserSession_userId_idx_a489d58a",
+        "table": "UserSession"
+      }
+    },
+    "precheck": [
+      {
+        "description": "ensure index \"UserSession_userId_idx_a489d58a\" does not exist",
+        "sql": "SELECT (to_regclass($1)) IS NULL AS \"result\"",
+        "params": [
+          "\"public\".\"UserSession_userId_idx_a489d58a\""
+        ]
+      }
+    ],
+    "execute": [
+      {
+        "description": "create index \"UserSession_userId_idx_a489d58a\"",
+        "sql": "CREATE INDEX \"UserSession_userId_idx_a489d58a\" ON \"public\".\"UserSession\" (\"userId\")",
+        "params": []
+      }
+    ],
+    "postcheck": [
+      {
+        "description": "verify index \"UserSession_userId_idx_a489d58a\" exists",
+        "sql": "SELECT (to_regclass($1)) IS NOT NULL AS \"result\"",
+        "params": [
+          "\"public\".\"UserSession_userId_idx_a489d58a\""
+        ]
+      }
+    ]
+  },
+  {
+    "id": "foreignKey.GroupPermissionAssignment.GroupPermissionAssignment_groupId_fkey",
+    "label": "Add foreign key \"GroupPermissionAssignment_groupId_fkey\" on \"GroupPermissionAssignment\"",
+    "operationClass": "additive",
+    "target": {
+      "id": "postgres",
+      "details": {
+        "schema": "public",
+        "objectType": "foreignKey",
+        "name": "GroupPermissionAssignment_groupId_fkey",
+        "table": "GroupPermissionAssignment"
+      }
+    },
+    "precheck": [
+      {
+        "description": "ensure FK \"GroupPermissionAssignment_groupId_fkey\" does not exist",
+        "sql": "SELECT NOT EXISTS (SELECT 1 AS \"one\" FROM \"pg_constraint\" AS \"c\" INNER JOIN \"pg_namespace\" AS \"n\" ON \"n\".\"oid\" = \"c\".\"connamespace\" WHERE (\"c\".\"conname\" = $1 AND \"n\".\"nspname\" = $2 AND \"c\".\"conrelid\" = to_regclass($3))) AS \"result\"",
+        "params": [
+          "GroupPermissionAssignment_groupId_fkey",
+          "public",
+          "\"public\".\"GroupPermissionAssignment\""
+        ]
+      }
+    ],
+    "execute": [
+      {
+        "description": "add FK \"GroupPermissionAssignment_groupId_fkey\"",
+        "sql": "ALTER TABLE \"public\".\"GroupPermissionAssignment\"\nADD CONSTRAINT \"GroupPermissionAssignment_groupId_fkey\"\nFOREIGN KEY (\"groupId\")\nREFERENCES \"public\".\"OrganizationGroup\" (\"id\")\nON DELETE CASCADE"
+      }
+    ],
+    "postcheck": [
+      {
+        "description": "verify FK \"GroupPermissionAssignment_groupId_fkey\" exists",
+        "sql": "SELECT EXISTS (SELECT 1 AS \"one\" FROM \"pg_constraint\" AS \"c\" INNER JOIN \"pg_namespace\" AS \"n\" ON \"n\".\"oid\" = \"c\".\"connamespace\" WHERE (\"c\".\"conname\" = $1 AND \"n\".\"nspname\" = $2 AND \"c\".\"conrelid\" = to_regclass($3))) AS \"result\"",
+        "params": [
+          "GroupPermissionAssignment_groupId_fkey",
+          "public",
+          "\"public\".\"GroupPermissionAssignment\""
+        ]
+      }
+    ]
+  },
+  {
+    "id": "foreignKey.GroupPermissionAssignment.GroupPermissionAssignment_permissionId_fkey",
+    "label": "Add foreign key \"GroupPermissionAssignment_permissionId_fkey\" on \"GroupPermissionAssignment\"",
+    "operationClass": "additive",
+    "target": {
+      "id": "postgres",
+      "details": {
+        "schema": "public",
+        "objectType": "foreignKey",
+        "name": "GroupPermissionAssignment_permissionId_fkey",
+        "table": "GroupPermissionAssignment"
+      }
+    },
+    "precheck": [
+      {
+        "description": "ensure FK \"GroupPermissionAssignment_permissionId_fkey\" does not exist",
+        "sql": "SELECT NOT EXISTS (SELECT 1 AS \"one\" FROM \"pg_constraint\" AS \"c\" INNER JOIN \"pg_namespace\" AS \"n\" ON \"n\".\"oid\" = \"c\".\"connamespace\" WHERE (\"c\".\"conname\" = $1 AND \"n\".\"nspname\" = $2 AND \"c\".\"conrelid\" = to_regclass($3))) AS \"result\"",
+        "params": [
+          "GroupPermissionAssignment_permissionId_fkey",
+          "public",
+          "\"public\".\"GroupPermissionAssignment\""
+        ]
+      }
+    ],
+    "execute": [
+      {
+        "description": "add FK \"GroupPermissionAssignment_permissionId_fkey\"",
+        "sql": "ALTER TABLE \"public\".\"GroupPermissionAssignment\"\nADD CONSTRAINT \"GroupPermissionAssignment_permissionId_fkey\"\nFOREIGN KEY (\"permissionId\")\nREFERENCES \"public\".\"Permission\" (\"id\")\nON DELETE CASCADE"
+      }
+    ],
+    "postcheck": [
+      {
+        "description": "verify FK \"GroupPermissionAssignment_permissionId_fkey\" exists",
+        "sql": "SELECT EXISTS (SELECT 1 AS \"one\" FROM \"pg_constraint\" AS \"c\" INNER JOIN \"pg_namespace\" AS \"n\" ON \"n\".\"oid\" = \"c\".\"connamespace\" WHERE (\"c\".\"conname\" = $1 AND \"n\".\"nspname\" = $2 AND \"c\".\"conrelid\" = to_regclass($3))) AS \"result\"",
+        "params": [
+          "GroupPermissionAssignment_permissionId_fkey",
+          "public",
+          "\"public\".\"GroupPermissionAssignment\""
+        ]
+      }
+    ]
+  },
+  {
+    "id": "foreignKey.IngestKey.IngestKey_orgId_fkey",
+    "label": "Add foreign key \"IngestKey_orgId_fkey\" on \"IngestKey\"",
+    "operationClass": "additive",
+    "target": {
+      "id": "postgres",
+      "details": {
+        "schema": "public",
+        "objectType": "foreignKey",
+        "name": "IngestKey_orgId_fkey",
+        "table": "IngestKey"
+      }
+    },
+    "precheck": [
+      {
+        "description": "ensure FK \"IngestKey_orgId_fkey\" does not exist",
+        "sql": "SELECT NOT EXISTS (SELECT 1 AS \"one\" FROM \"pg_constraint\" AS \"c\" INNER JOIN \"pg_namespace\" AS \"n\" ON \"n\".\"oid\" = \"c\".\"connamespace\" WHERE (\"c\".\"conname\" = $1 AND \"n\".\"nspname\" = $2 AND \"c\".\"conrelid\" = to_regclass($3))) AS \"result\"",
+        "params": [
+          "IngestKey_orgId_fkey",
+          "public",
+          "\"public\".\"IngestKey\""
+        ]
+      }
+    ],
+    "execute": [
+      {
+        "description": "add FK \"IngestKey_orgId_fkey\"",
+        "sql": "ALTER TABLE \"public\".\"IngestKey\"\nADD CONSTRAINT \"IngestKey_orgId_fkey\"\nFOREIGN KEY (\"orgId\")\nREFERENCES \"public\".\"Organization\" (\"id\")\nON DELETE CASCADE"
+      }
+    ],
+    "postcheck": [
+      {
+        "description": "verify FK \"IngestKey_orgId_fkey\" exists",
+        "sql": "SELECT EXISTS (SELECT 1 AS \"one\" FROM \"pg_constraint\" AS \"c\" INNER JOIN \"pg_namespace\" AS \"n\" ON \"n\".\"oid\" = \"c\".\"connamespace\" WHERE (\"c\".\"conname\" = $1 AND \"n\".\"nspname\" = $2 AND \"c\".\"conrelid\" = to_regclass($3))) AS \"result\"",
+        "params": [
+          "IngestKey_orgId_fkey",
+          "public",
+          "\"public\".\"IngestKey\""
+        ]
+      }
+    ]
+  },
+  {
+    "id": "foreignKey.MemberGroupAssignment.MemberGroupAssignment_memberId_fkey",
+    "label": "Add foreign key \"MemberGroupAssignment_memberId_fkey\" on \"MemberGroupAssignment\"",
+    "operationClass": "additive",
+    "target": {
+      "id": "postgres",
+      "details": {
+        "schema": "public",
+        "objectType": "foreignKey",
+        "name": "MemberGroupAssignment_memberId_fkey",
+        "table": "MemberGroupAssignment"
+      }
+    },
+    "precheck": [
+      {
+        "description": "ensure FK \"MemberGroupAssignment_memberId_fkey\" does not exist",
+        "sql": "SELECT NOT EXISTS (SELECT 1 AS \"one\" FROM \"pg_constraint\" AS \"c\" INNER JOIN \"pg_namespace\" AS \"n\" ON \"n\".\"oid\" = \"c\".\"connamespace\" WHERE (\"c\".\"conname\" = $1 AND \"n\".\"nspname\" = $2 AND \"c\".\"conrelid\" = to_regclass($3))) AS \"result\"",
+        "params": [
+          "MemberGroupAssignment_memberId_fkey",
+          "public",
+          "\"public\".\"MemberGroupAssignment\""
+        ]
+      }
+    ],
+    "execute": [
+      {
+        "description": "add FK \"MemberGroupAssignment_memberId_fkey\"",
+        "sql": "ALTER TABLE \"public\".\"MemberGroupAssignment\"\nADD CONSTRAINT \"MemberGroupAssignment_memberId_fkey\"\nFOREIGN KEY (\"memberId\")\nREFERENCES \"public\".\"OrganizationMember\" (\"id\")\nON DELETE CASCADE"
+      }
+    ],
+    "postcheck": [
+      {
+        "description": "verify FK \"MemberGroupAssignment_memberId_fkey\" exists",
+        "sql": "SELECT EXISTS (SELECT 1 AS \"one\" FROM \"pg_constraint\" AS \"c\" INNER JOIN \"pg_namespace\" AS \"n\" ON \"n\".\"oid\" = \"c\".\"connamespace\" WHERE (\"c\".\"conname\" = $1 AND \"n\".\"nspname\" = $2 AND \"c\".\"conrelid\" = to_regclass($3))) AS \"result\"",
+        "params": [
+          "MemberGroupAssignment_memberId_fkey",
+          "public",
+          "\"public\".\"MemberGroupAssignment\""
+        ]
+      }
+    ]
+  },
+  {
+    "id": "foreignKey.MemberGroupAssignment.MemberGroupAssignment_groupId_fkey",
+    "label": "Add foreign key \"MemberGroupAssignment_groupId_fkey\" on \"MemberGroupAssignment\"",
+    "operationClass": "additive",
+    "target": {
+      "id": "postgres",
+      "details": {
+        "schema": "public",
+        "objectType": "foreignKey",
+        "name": "MemberGroupAssignment_groupId_fkey",
+        "table": "MemberGroupAssignment"
+      }
+    },
+    "precheck": [
+      {
+        "description": "ensure FK \"MemberGroupAssignment_groupId_fkey\" does not exist",
+        "sql": "SELECT NOT EXISTS (SELECT 1 AS \"one\" FROM \"pg_constraint\" AS \"c\" INNER JOIN \"pg_namespace\" AS \"n\" ON \"n\".\"oid\" = \"c\".\"connamespace\" WHERE (\"c\".\"conname\" = $1 AND \"n\".\"nspname\" = $2 AND \"c\".\"conrelid\" = to_regclass($3))) AS \"result\"",
+        "params": [
+          "MemberGroupAssignment_groupId_fkey",
+          "public",
+          "\"public\".\"MemberGroupAssignment\""
+        ]
+      }
+    ],
+    "execute": [
+      {
+        "description": "add FK \"MemberGroupAssignment_groupId_fkey\"",
+        "sql": "ALTER TABLE \"public\".\"MemberGroupAssignment\"\nADD CONSTRAINT \"MemberGroupAssignment_groupId_fkey\"\nFOREIGN KEY (\"groupId\")\nREFERENCES \"public\".\"OrganizationGroup\" (\"id\")\nON DELETE CASCADE"
+      }
+    ],
+    "postcheck": [
+      {
+        "description": "verify FK \"MemberGroupAssignment_groupId_fkey\" exists",
+        "sql": "SELECT EXISTS (SELECT 1 AS \"one\" FROM \"pg_constraint\" AS \"c\" INNER JOIN \"pg_namespace\" AS \"n\" ON \"n\".\"oid\" = \"c\".\"connamespace\" WHERE (\"c\".\"conname\" = $1 AND \"n\".\"nspname\" = $2 AND \"c\".\"conrelid\" = to_regclass($3))) AS \"result\"",
+        "params": [
+          "MemberGroupAssignment_groupId_fkey",
+          "public",
+          "\"public\".\"MemberGroupAssignment\""
+        ]
+      }
+    ]
+  },
+  {
+    "id": "foreignKey.OAuthAccount.OAuthAccount_userId_fkey",
+    "label": "Add foreign key \"OAuthAccount_userId_fkey\" on \"OAuthAccount\"",
+    "operationClass": "additive",
+    "target": {
+      "id": "postgres",
+      "details": {
+        "schema": "public",
+        "objectType": "foreignKey",
+        "name": "OAuthAccount_userId_fkey",
+        "table": "OAuthAccount"
+      }
+    },
+    "precheck": [
+      {
+        "description": "ensure FK \"OAuthAccount_userId_fkey\" does not exist",
+        "sql": "SELECT NOT EXISTS (SELECT 1 AS \"one\" FROM \"pg_constraint\" AS \"c\" INNER JOIN \"pg_namespace\" AS \"n\" ON \"n\".\"oid\" = \"c\".\"connamespace\" WHERE (\"c\".\"conname\" = $1 AND \"n\".\"nspname\" = $2 AND \"c\".\"conrelid\" = to_regclass($3))) AS \"result\"",
+        "params": [
+          "OAuthAccount_userId_fkey",
+          "public",
+          "\"public\".\"OAuthAccount\""
+        ]
+      }
+    ],
+    "execute": [
+      {
+        "description": "add FK \"OAuthAccount_userId_fkey\"",
+        "sql": "ALTER TABLE \"public\".\"OAuthAccount\"\nADD CONSTRAINT \"OAuthAccount_userId_fkey\"\nFOREIGN KEY (\"userId\")\nREFERENCES \"public\".\"User\" (\"id\")\nON DELETE CASCADE"
+      }
+    ],
+    "postcheck": [
+      {
+        "description": "verify FK \"OAuthAccount_userId_fkey\" exists",
+        "sql": "SELECT EXISTS (SELECT 1 AS \"one\" FROM \"pg_constraint\" AS \"c\" INNER JOIN \"pg_namespace\" AS \"n\" ON \"n\".\"oid\" = \"c\".\"connamespace\" WHERE (\"c\".\"conname\" = $1 AND \"n\".\"nspname\" = $2 AND \"c\".\"conrelid\" = to_regclass($3))) AS \"result\"",
+        "params": [
+          "OAuthAccount_userId_fkey",
+          "public",
+          "\"public\".\"OAuthAccount\""
+        ]
+      }
+    ]
+  },
+  {
+    "id": "foreignKey.Organization.Organization_createdById_fkey",
+    "label": "Add foreign key \"Organization_createdById_fkey\" on \"Organization\"",
+    "operationClass": "additive",
+    "target": {
+      "id": "postgres",
+      "details": {
+        "schema": "public",
+        "objectType": "foreignKey",
+        "name": "Organization_createdById_fkey",
+        "table": "Organization"
+      }
+    },
+    "precheck": [
+      {
+        "description": "ensure FK \"Organization_createdById_fkey\" does not exist",
+        "sql": "SELECT NOT EXISTS (SELECT 1 AS \"one\" FROM \"pg_constraint\" AS \"c\" INNER JOIN \"pg_namespace\" AS \"n\" ON \"n\".\"oid\" = \"c\".\"connamespace\" WHERE (\"c\".\"conname\" = $1 AND \"n\".\"nspname\" = $2 AND \"c\".\"conrelid\" = to_regclass($3))) AS \"result\"",
+        "params": [
+          "Organization_createdById_fkey",
+          "public",
+          "\"public\".\"Organization\""
+        ]
+      }
+    ],
+    "execute": [
+      {
+        "description": "add FK \"Organization_createdById_fkey\"",
+        "sql": "ALTER TABLE \"public\".\"Organization\"\nADD CONSTRAINT \"Organization_createdById_fkey\"\nFOREIGN KEY (\"createdById\")\nREFERENCES \"public\".\"User\" (\"id\")\nON DELETE RESTRICT"
+      }
+    ],
+    "postcheck": [
+      {
+        "description": "verify FK \"Organization_createdById_fkey\" exists",
+        "sql": "SELECT EXISTS (SELECT 1 AS \"one\" FROM \"pg_constraint\" AS \"c\" INNER JOIN \"pg_namespace\" AS \"n\" ON \"n\".\"oid\" = \"c\".\"connamespace\" WHERE (\"c\".\"conname\" = $1 AND \"n\".\"nspname\" = $2 AND \"c\".\"conrelid\" = to_regclass($3))) AS \"result\"",
+        "params": [
+          "Organization_createdById_fkey",
+          "public",
+          "\"public\".\"Organization\""
+        ]
+      }
+    ]
+  },
+  {
+    "id": "foreignKey.OrganizationGroup.OrganizationGroup_orgId_fkey",
+    "label": "Add foreign key \"OrganizationGroup_orgId_fkey\" on \"OrganizationGroup\"",
+    "operationClass": "additive",
+    "target": {
+      "id": "postgres",
+      "details": {
+        "schema": "public",
+        "objectType": "foreignKey",
+        "name": "OrganizationGroup_orgId_fkey",
+        "table": "OrganizationGroup"
+      }
+    },
+    "precheck": [
+      {
+        "description": "ensure FK \"OrganizationGroup_orgId_fkey\" does not exist",
+        "sql": "SELECT NOT EXISTS (SELECT 1 AS \"one\" FROM \"pg_constraint\" AS \"c\" INNER JOIN \"pg_namespace\" AS \"n\" ON \"n\".\"oid\" = \"c\".\"connamespace\" WHERE (\"c\".\"conname\" = $1 AND \"n\".\"nspname\" = $2 AND \"c\".\"conrelid\" = to_regclass($3))) AS \"result\"",
+        "params": [
+          "OrganizationGroup_orgId_fkey",
+          "public",
+          "\"public\".\"OrganizationGroup\""
+        ]
+      }
+    ],
+    "execute": [
+      {
+        "description": "add FK \"OrganizationGroup_orgId_fkey\"",
+        "sql": "ALTER TABLE \"public\".\"OrganizationGroup\"\nADD CONSTRAINT \"OrganizationGroup_orgId_fkey\"\nFOREIGN KEY (\"orgId\")\nREFERENCES \"public\".\"Organization\" (\"id\")\nON DELETE CASCADE"
+      }
+    ],
+    "postcheck": [
+      {
+        "description": "verify FK \"OrganizationGroup_orgId_fkey\" exists",
+        "sql": "SELECT EXISTS (SELECT 1 AS \"one\" FROM \"pg_constraint\" AS \"c\" INNER JOIN \"pg_namespace\" AS \"n\" ON \"n\".\"oid\" = \"c\".\"connamespace\" WHERE (\"c\".\"conname\" = $1 AND \"n\".\"nspname\" = $2 AND \"c\".\"conrelid\" = to_regclass($3))) AS \"result\"",
+        "params": [
+          "OrganizationGroup_orgId_fkey",
+          "public",
+          "\"public\".\"OrganizationGroup\""
+        ]
+      }
+    ]
+  },
+  {
+    "id": "foreignKey.OrganizationMember.OrganizationMember_orgId_fkey",
+    "label": "Add foreign key \"OrganizationMember_orgId_fkey\" on \"OrganizationMember\"",
+    "operationClass": "additive",
+    "target": {
+      "id": "postgres",
+      "details": {
+        "schema": "public",
+        "objectType": "foreignKey",
+        "name": "OrganizationMember_orgId_fkey",
+        "table": "OrganizationMember"
+      }
+    },
+    "precheck": [
+      {
+        "description": "ensure FK \"OrganizationMember_orgId_fkey\" does not exist",
+        "sql": "SELECT NOT EXISTS (SELECT 1 AS \"one\" FROM \"pg_constraint\" AS \"c\" INNER JOIN \"pg_namespace\" AS \"n\" ON \"n\".\"oid\" = \"c\".\"connamespace\" WHERE (\"c\".\"conname\" = $1 AND \"n\".\"nspname\" = $2 AND \"c\".\"conrelid\" = to_regclass($3))) AS \"result\"",
+        "params": [
+          "OrganizationMember_orgId_fkey",
+          "public",
+          "\"public\".\"OrganizationMember\""
+        ]
+      }
+    ],
+    "execute": [
+      {
+        "description": "add FK \"OrganizationMember_orgId_fkey\"",
+        "sql": "ALTER TABLE \"public\".\"OrganizationMember\"\nADD CONSTRAINT \"OrganizationMember_orgId_fkey\"\nFOREIGN KEY (\"orgId\")\nREFERENCES \"public\".\"Organization\" (\"id\")\nON DELETE CASCADE"
+      }
+    ],
+    "postcheck": [
+      {
+        "description": "verify FK \"OrganizationMember_orgId_fkey\" exists",
+        "sql": "SELECT EXISTS (SELECT 1 AS \"one\" FROM \"pg_constraint\" AS \"c\" INNER JOIN \"pg_namespace\" AS \"n\" ON \"n\".\"oid\" = \"c\".\"connamespace\" WHERE (\"c\".\"conname\" = $1 AND \"n\".\"nspname\" = $2 AND \"c\".\"conrelid\" = to_regclass($3))) AS \"result\"",
+        "params": [
+          "OrganizationMember_orgId_fkey",
+          "public",
+          "\"public\".\"OrganizationMember\""
+        ]
+      }
+    ]
+  },
+  {
+    "id": "foreignKey.OrganizationMember.OrganizationMember_userId_fkey",
+    "label": "Add foreign key \"OrganizationMember_userId_fkey\" on \"OrganizationMember\"",
+    "operationClass": "additive",
+    "target": {
+      "id": "postgres",
+      "details": {
+        "schema": "public",
+        "objectType": "foreignKey",
+        "name": "OrganizationMember_userId_fkey",
+        "table": "OrganizationMember"
+      }
+    },
+    "precheck": [
+      {
+        "description": "ensure FK \"OrganizationMember_userId_fkey\" does not exist",
+        "sql": "SELECT NOT EXISTS (SELECT 1 AS \"one\" FROM \"pg_constraint\" AS \"c\" INNER JOIN \"pg_namespace\" AS \"n\" ON \"n\".\"oid\" = \"c\".\"connamespace\" WHERE (\"c\".\"conname\" = $1 AND \"n\".\"nspname\" = $2 AND \"c\".\"conrelid\" = to_regclass($3))) AS \"result\"",
+        "params": [
+          "OrganizationMember_userId_fkey",
+          "public",
+          "\"public\".\"OrganizationMember\""
+        ]
+      }
+    ],
+    "execute": [
+      {
+        "description": "add FK \"OrganizationMember_userId_fkey\"",
+        "sql": "ALTER TABLE \"public\".\"OrganizationMember\"\nADD CONSTRAINT \"OrganizationMember_userId_fkey\"\nFOREIGN KEY (\"userId\")\nREFERENCES \"public\".\"User\" (\"id\")\nON DELETE CASCADE"
+      }
+    ],
+    "postcheck": [
+      {
+        "description": "verify FK \"OrganizationMember_userId_fkey\" exists",
+        "sql": "SELECT EXISTS (SELECT 1 AS \"one\" FROM \"pg_constraint\" AS \"c\" INNER JOIN \"pg_namespace\" AS \"n\" ON \"n\".\"oid\" = \"c\".\"connamespace\" WHERE (\"c\".\"conname\" = $1 AND \"n\".\"nspname\" = $2 AND \"c\".\"conrelid\" = to_regclass($3))) AS \"result\"",
+        "params": [
+          "OrganizationMember_userId_fkey",
+          "public",
+          "\"public\".\"OrganizationMember\""
+        ]
+      }
+    ]
+  },
+  {
+    "id": "foreignKey.UserSession.UserSession_userId_fkey",
+    "label": "Add foreign key \"UserSession_userId_fkey\" on \"UserSession\"",
+    "operationClass": "additive",
+    "target": {
+      "id": "postgres",
+      "details": {
+        "schema": "public",
+        "objectType": "foreignKey",
+        "name": "UserSession_userId_fkey",
+        "table": "UserSession"
+      }
+    },
+    "precheck": [
+      {
+        "description": "ensure FK \"UserSession_userId_fkey\" does not exist",
+        "sql": "SELECT NOT EXISTS (SELECT 1 AS \"one\" FROM \"pg_constraint\" AS \"c\" INNER JOIN \"pg_namespace\" AS \"n\" ON \"n\".\"oid\" = \"c\".\"connamespace\" WHERE (\"c\".\"conname\" = $1 AND \"n\".\"nspname\" = $2 AND \"c\".\"conrelid\" = to_regclass($3))) AS \"result\"",
+        "params": [
+          "UserSession_userId_fkey",
+          "public",
+          "\"public\".\"UserSession\""
+        ]
+      }
+    ],
+    "execute": [
+      {
+        "description": "add FK \"UserSession_userId_fkey\"",
+        "sql": "ALTER TABLE \"public\".\"UserSession\"\nADD CONSTRAINT \"UserSession_userId_fkey\"\nFOREIGN KEY (\"userId\")\nREFERENCES \"public\".\"User\" (\"id\")\nON DELETE CASCADE"
+      }
+    ],
+    "postcheck": [
+      {
+        "description": "verify FK \"UserSession_userId_fkey\" exists",
+        "sql": "SELECT EXISTS (SELECT 1 AS \"one\" FROM \"pg_constraint\" AS \"c\" INNER JOIN \"pg_namespace\" AS \"n\" ON \"n\".\"oid\" = \"c\".\"connamespace\" WHERE (\"c\".\"conname\" = $1 AND \"n\".\"nspname\" = $2 AND \"c\".\"conrelid\" = to_regclass($3))) AS \"result\"",
+        "params": [
+          "UserSession_userId_fkey",
+          "public",
+          "\"public\".\"UserSession\""
+        ]
+      }
+    ]
+  }
+]
