@@ -1,0 +1,25 @@
+syntax = "proto3";
+
+package email;
+
+service EmailService {
+  rpc SendOtp (SendOtpRequest) returns (SendOtpResponse);
+  rpc HealthCheck (HealthCheckRequest) returns (HealthCheckResponse);
+}
+
+message SendOtpRequest {
+  string email = 1;
+  string type = 2;
+  string name = 3;
+}
+
+message SendOtpResponse {
+  string otp_hash = 1;
+  int64 expires_at = 2;
+}
+
+message HealthCheckRequest {}
+
+message HealthCheckResponse {
+  string status = 1;
+}

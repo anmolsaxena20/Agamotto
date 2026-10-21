@@ -1,68 +1,102 @@
 import 'dotenv/config';
-import express from 'express';
+import path from 'node:path';
+import { fileURLToPath } from 'node:url';
+import grpc from '@grpc/grpc-js';
+import protoLoader from '@grpc/proto-loader';
 import { Resend } from 'resend';
+import { generateOtp } from './src/otp.js';
+import { signupTemplate, resetTemplate } from './src/templates.js';
 
-const app = express();
-const port = Number.parseInt(process.env.PORT ?? '5000', 10);
-const resend = process.env.RESEND_API_KEY
-  ? new Resend(process.env.RESEND_API_KEY)
-  : null;
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 
-app.use(express.json({ limit: '64kb' }));
-
-app.get('/healthz', (_request, response) => {
-  response.json({ status: 'ok', service: 'email-service' });
+const PROTO_PATH = path.join(__dirname, 'proto', 'email.proto');
+const packageDefinition = protoLoader.loadSync(PROTO_PATH, {
+  keepCase: true,
+  longs: String,
+  enums: String,
+  defaults: true,
+  oneofs: true,
 });
 
-app.post('/send', async (request, response, next) => {
-  const { from, to, subject, html, text } = request.body ?? {};
+const protoDescriptor = grpc.loadPackageDefinition(packageDefinition);
+const emailProto = protoDescriptor.email;
 
-  if (
-    typeof from !== 'string' ||
-    typeof to !== 'string' ||
-    typeof subject !== 'string' ||
-    (typeof html !== 'string' && typeof text !== 'string')
-  ) {
-    response.status(400).json({
-      error: 'from, to, subject, and html or text are required',
+const resendApiKey = process.env.RESEND_API_KEY;
+const resend = resendApiKey ? new Resend(resendApiKey) : null;
+const fromEmail = process.env.EMAIL_FROM || 'Agamotto <onboarding@resend.dev>';
+const port = process.env.PORT || '5000';
+
+async function sendOtp(call, callback) {
+  const { email, type, name } = call.request;
+
+  if (!email) {
+    return callback({
+      code: grpc.status.INVALID_ARGUMENT,
+      message: 'Email is required',
     });
-    return;
   }
 
+  const { otp, hash, expiresAt } = generateOtp();
+
+  const template = type === 'forgot-password' || type === 'reset'
+    ? resetTemplate(name, otp)
+    : signupTemplate(name, otp);
+
   if (!resend) {
-    response.status(503).json({ error: 'RESEND_API_KEY is not configured' });
-    return;
+    console.warn(`RESEND_API_KEY not configured. OTP for ${email} is ${otp}`);
+    return callback(null, {
+      otp_hash: hash,
+      expires_at: expiresAt,
+    });
   }
 
   try {
-    const { data, error } = await resend.emails.send({
-      from,
-      to: [to],
-      subject,
-      ...(html ? { html } : {}),
-      ...(text ? { text } : {}),
+    const { error } = await resend.emails.send({
+      from: fromEmail,
+      to: [email],
+      subject: template.subject,
+      html: template.html,
     });
 
     if (error) {
-      response.status(502).json({ error: error.message });
-      return;
+      return callback({
+        code: grpc.status.INTERNAL,
+        message: error.message,
+      });
     }
 
-    response.status(202).json({ id: data?.id });
-  } catch (error) {
-    next(error);
+    return callback(null, {
+      otp_hash: hash,
+      expires_at: expiresAt,
+    });
+  } catch (err) {
+    return callback({
+      code: grpc.status.INTERNAL,
+      message: err.message,
+    });
   }
-});
-
-app.use((error, _request, response, _next) => {
-  console.error(error);
-  response.status(500).json({ error: 'internal server error' });
-});
-
-if (!Number.isInteger(port) || port < 1 || port > 65535) {
-  throw new Error('PORT must be an integer between 1 and 65535');
 }
 
-app.listen(port, () => {
-  console.log(`email-service listening on port ${port}`);
-});
+function healthCheck(_call, callback) {
+  callback(null, { status: 'SERVING' });
+}
+
+function startServer() {
+  const server = new grpc.Server();
+  server.addService(emailProto.EmailService.service, {
+    SendOtp: sendOtp,
+    HealthCheck: healthCheck,
+  });
+
+  const bindAddress = `0.0.0.0:${port}`;
+  server.bindAsync(bindAddress, grpc.ServerCredentials.createInsecure(), (err, boundPort) => {
+    if (err) {
+      console.error(err);
+      process.exit(1);
+    }
+    console.log(`email-service gRPC listening on port ${boundPort}`);
+  });
+}
+
+startServer();

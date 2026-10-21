@@ -1,9 +1,142 @@
 // use prisma-8
+
 model User {
-  id        Int                        @id @default(autoincrement())
-  email     String                     @unique
-  username  String?
-  name      String?
-  createdAt TimestamptzString          @default(now())
-  updatedAt temporal.updatedAtString()
+  id                   String                     @id @default(uuid())
+  email                String                     @unique
+  username             String?                    @unique
+  name                 String?
+  hashedPassword       String?
+  avatarType           String                     @default("DEFAULT")
+  avatarKey            String?
+  avatarUrl            String?
+  isEmailVerified      Boolean                    @default(false)
+  status               String                     @default("ACTIVE")
+  createdAt            TimestamptzString          @default(now())
+  updatedAt            temporal.updatedAtString()
+  oauthAccounts        OAuthAccount[]
+  sessions             UserSession[]
+  memberships          OrganizationMember[]
+  createdOrganizations Organization[]             @relation("OrgCreator")
+}
+
+model OAuthAccount {
+  id                String                     @id @default(uuid())
+  userId            String
+  provider          String
+  providerAccountId String
+  providerEmail     String?
+  avatarUrl         String?
+  accessToken       String?
+  refreshToken      String?
+  tokenExpiresAt    TimestamptzString?
+  scope             String?
+  createdAt         TimestamptzString          @default(now())
+  updatedAt         temporal.updatedAtString()
+  user              User                       @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([provider, providerAccountId])
+  @@unique([userId, provider])
+}
+
+model UserSession {
+  id               String            @id @default(uuid())
+  userId           String
+  refreshTokenHash String            @unique
+  userAgent        String?
+  ipAddress        String?
+  isRevoked        Boolean           @default(false)
+  expiresAt        TimestamptzString
+  createdAt        TimestamptzString @default(now())
+  user             User              @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model Organization {
+  id          String               @id @default(uuid())
+  name        String
+  slug        String               @unique
+  createdById String
+  status      String               @default("ACTIVE")
+  createdAt   TimestamptzString    @default(now())
+  updatedAt   temporal.updatedAtString()
+  createdBy   User                 @relation("OrgCreator", fields: [createdById], references: [id], onDelete: Restrict)
+  members     OrganizationMember[]
+  groups      OrganizationGroup[]
+  ingestKeys  IngestKey[]
+}
+
+model OrganizationMember {
+  id               String                  @id @default(uuid())
+  orgId            String
+  userId           String
+  status           String                  @default("ACTIVE")
+  invitedEmail     String?
+  createdAt        TimestamptzString       @default(now())
+  updatedAt        temporal.updatedAtString()
+  organization     Organization            @relation(fields: [orgId], references: [id], onDelete: Cascade)
+  user             User                    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  groupAssignments MemberGroupAssignment[]
+
+  @@unique([orgId, userId])
+}
+
+model OrganizationGroup {
+  id                  String                    @id @default(uuid())
+  orgId               String
+  name                String
+  code                String
+  description         String?
+  isSystem            Boolean                   @default(false)
+  createdAt           TimestamptzString         @default(now())
+  updatedAt           temporal.updatedAtString()
+  organization        Organization              @relation(fields: [orgId], references: [id], onDelete: Cascade)
+  permissionMappings GroupPermissionAssignment[]
+  memberAssignments   MemberGroupAssignment[]
+
+  @@unique([orgId, code])
+}
+
+model Permission {
+  id          String                      @id @default(uuid())
+  key         String                      @unique
+  category    String
+  description String
+  createdAt   TimestamptzString           @default(now())
+  groups      GroupPermissionAssignment[]
+}
+
+model GroupPermissionAssignment {
+  id           String            @id @default(uuid())
+  groupId      String
+  permissionId String
+  createdAt    TimestamptzString @default(now())
+  group        OrganizationGroup @relation(fields: [groupId], references: [id], onDelete: Cascade)
+  permission   Permission        @relation(fields: [permissionId], references: [id], onDelete: Cascade)
+
+  @@unique([groupId, permissionId])
+}
+
+model MemberGroupAssignment {
+  id        String             @id @default(uuid())
+  memberId  String
+  groupId   String
+  createdAt TimestamptzString  @default(now())
+  member    OrganizationMember @relation(fields: [memberId], references: [id], onDelete: Cascade)
+  group     OrganizationGroup  @relation(fields: [groupId], references: [id], onDelete: Cascade)
+
+  @@unique([memberId, groupId])
+}
+
+model IngestKey {
+  id           String                     @id @default(uuid())
+  orgId        String
+  name         String
+  keyHash      String                     @unique
+  keyPrefix    String
+  isActive     Boolean                    @default(true)
+  createdById  String
+  lastUsedAt   TimestamptzString?
+  expiresAt    TimestamptzString?
+  createdAt    TimestamptzString          @default(now())
+  updatedAt    temporal.updatedAtString()
+  organization Organization               @relation(fields: [orgId], references: [id], onDelete: Cascade)
 }
