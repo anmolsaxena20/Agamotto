@@ -68,8 +68,8 @@ jobs:
 
             LOWER_IMAGE=$(echo "${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}" | tr '[:upper:]' '[:lower:]')
             CONTAINER_NAME="agamotto-ingestion-gateway"
-            HOST_PORT="4318"
-            CONTAINER_PORT="4318"
+            HOST_PORT="4317"
+            CONTAINER_PORT="4317"
             ENV_FILE="$HOME/.env.ingestion-gateway"
             NETWORK_NAME="agamotto-network"
 
