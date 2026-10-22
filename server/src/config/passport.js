@@ -3,7 +3,7 @@ import { Strategy as GoogleStrategy } from 'passport-google-oauth20';
 import { Strategy as GitHubStrategy } from 'passport-github2';
 import crypto from 'node:crypto';
 import { db } from '../prisma/db.ts';
-import { provisionDefaultGroups } from '../services/seed.service.js';
+import { provisionDefaultGroups } from '../services/rbac.service.js';
 
 export function configurePassport() {
   const googleClientId = process.env.GOOGLE_CLIENT_ID;

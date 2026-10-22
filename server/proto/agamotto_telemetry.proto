@@ -1,0 +1,16 @@
+syntax = "proto3";
+
+// Temporary Agamotto transport. Each payload is the protobuf encoding of the
+// corresponding official OTLP Export*ServiceRequest, not a new data model.
+package agamotto.telemetry;
+
+service AgamottoIngestion {
+  rpc ExportTraces(TraceBatch) returns (ExportResponse);
+  rpc ExportMetrics(MetricBatch) returns (ExportResponse);
+  rpc ExportLogs(LogBatch) returns (ExportResponse);
+}
+
+message TraceBatch { bytes otlp_export_request = 1; }
+message MetricBatch { bytes otlp_export_request = 1; }
+message LogBatch { bytes otlp_export_request = 1; }
+message ExportResponse {}

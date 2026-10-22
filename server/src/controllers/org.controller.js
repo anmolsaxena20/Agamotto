@@ -1,7 +1,6 @@
 import crypto from 'node:crypto';
 import { db } from '../prisma/db.ts';
-import { provisionDefaultGroups } from '../services/seed.service.js';
-import { getMemberGroups } from '../services/rbac.service.js';
+import { provisionDefaultGroups, getMemberGroups } from '../services/rbac.service.js';
 
 export async function createOrg(req, res, next) {
   try {

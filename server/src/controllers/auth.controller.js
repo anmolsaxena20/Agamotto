@@ -14,7 +14,7 @@ import {
   getPendingOtp,
   deletePendingOtp,
 } from '../services/otp.store.js';
-import { provisionDefaultGroups } from '../services/seed.service.js';
+import { provisionDefaultGroups } from '../services/rbac.service.js';
 
 const CLIENT_URL = process.env.CLIENT_URL || 'http://localhost:5173';
 
