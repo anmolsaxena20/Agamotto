@@ -6,6 +6,10 @@ import protoLoader from '@grpc/proto-loader';
 import { Resend } from 'resend';
 import { generateOtp } from './src/otp.js';
 import { signupTemplate, resetTemplate } from './src/templates.js';
+import { context, trace, SpanKind } from '@opentelemetry/api';
+import { extractGrpcContext, shutdownTelemetry, startTelemetry } from './src/observability/index.js';
+
+await startTelemetry({ serviceName: 'email-service' });
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -44,7 +48,7 @@ async function sendOtp(call, callback) {
     : signupTemplate(name, otp);
 
   if (!resend) {
-    console.warn(`RESEND_API_KEY not configured. OTP for ${email} is ${otp}`);
+    console.warn('RESEND_API_KEY not configured; email delivery was skipped');
     return callback(null, {
       otp_hash: hash,
       expires_at: expiresAt,
@@ -85,8 +89,8 @@ function healthCheck(_call, callback) {
 function startServer() {
   const server = new grpc.Server();
   server.addService(emailProto.EmailService.service, {
-    SendOtp: sendOtp,
-    HealthCheck: healthCheck,
+    SendOtp: (call, callback) => withGrpcSpan(call, 'email.EmailService/SendOtp', () => sendOtp(call, callback)),
+    HealthCheck: (call, callback) => withGrpcSpan(call, 'email.EmailService/HealthCheck', () => healthCheck(call, callback)),
   });
 
   const bindAddress = `0.0.0.0:${port}`;
@@ -96,6 +100,17 @@ function startServer() {
       process.exit(1);
     }
     console.log(`email-service gRPC listening on port ${boundPort}`);
+    for (const signal of ['SIGINT', 'SIGTERM']) {
+      process.once(signal, () => server.tryShutdown(() => shutdownTelemetry().finally(() => process.exit(0))));
+    }
+  });
+}
+
+function withGrpcSpan(call, name, handler) {
+  const parent = extractGrpcContext(call.metadata);
+  const span = trace.getTracer('email-service.grpc').startSpan(name, { kind: SpanKind.SERVER }, parent);
+  return context.with(trace.setSpan(parent, span), async () => {
+    try { return await handler(); } catch (error) { span.recordException(error); throw error; } finally { span.end(); }
   });
 }
 

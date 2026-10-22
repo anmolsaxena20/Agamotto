@@ -2,6 +2,8 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import grpc from '@grpc/grpc-js';
 import protoLoader from '@grpc/proto-loader';
+import { context, trace, SpanKind } from '@opentelemetry/api';
+import { injectGrpcContext } from '../observability/index.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -26,7 +28,11 @@ const client = new emailProto.EmailService(target, grpc.credentials.createInsecu
 
 export function sendOtpEmail(email, type, name = '') {
   return new Promise((resolve, reject) => {
-    client.SendOtp({ email, type, name }, (err, response) => {
+    const span = trace.getTracer('server.grpc').startSpan('email.EmailService/SendOtp', { kind: SpanKind.CLIENT });
+    const metadata = injectGrpcContext(new grpc.Metadata(), trace.setSpan(context.active(), span));
+    client.SendOtp({ email, type, name }, metadata, (err, response) => {
+      if (err) span.recordException(err);
+      span.end();
       if (err) {
         return reject(err);
       }
@@ -40,7 +46,8 @@ export function sendOtpEmail(email, type, name = '') {
 
 export function checkEmailServiceHealth() {
   return new Promise((resolve, reject) => {
-    client.HealthCheck({}, (err, response) => {
+    const metadata = injectGrpcContext(new grpc.Metadata());
+    client.HealthCheck({}, metadata, (err, response) => {
       if (err) {
         return reject(err);
       }
