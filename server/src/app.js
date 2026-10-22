@@ -4,6 +4,8 @@ import passport from 'passport';
 import cors from 'cors';
 import { configurePassport } from './config/passport.js';
 import authRoutes from './routes/auth.routes.js';
+import orgRoutes from './routes/org.routes.js';
+import permissionRoutes from './routes/permission.routes.js';
 import { errorHandler } from './middleware/errorHandler.js';
 
 export function createApp() {
@@ -28,6 +30,8 @@ export function createApp() {
   });
 
   app.use('/auth', authRoutes);
+  app.use('/orgs', orgRoutes);
+  app.use('/permissions', permissionRoutes);
 
   app.use((_req, res) => {
     res.status(404).json({ error: 'Endpoint not found' });
