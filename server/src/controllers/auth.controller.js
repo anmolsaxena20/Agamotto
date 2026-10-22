@@ -14,6 +14,7 @@ import {
   getPendingOtp,
   deletePendingOtp,
 } from '../services/otp.store.js';
+import { provisionDefaultGroups } from '../services/seed.service.js';
 
 const CLIENT_URL = process.env.CLIENT_URL || 'http://localhost:5173';
 
@@ -135,11 +136,13 @@ export async function verifyEmail(req, res, next) {
         createdById: user.id,
       });
 
-      await db.orm.public.OrganizationMember.create({
+      const member = await db.orm.public.OrganizationMember.create({
         orgId: org.id,
         userId: user.id,
         status: 'ACTIVE',
       });
+
+      await provisionDefaultGroups(org.id, member.id);
     }
 
     const accessToken = generateAccessToken(user);

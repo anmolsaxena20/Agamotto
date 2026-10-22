@@ -3,6 +3,7 @@ import { Strategy as GoogleStrategy } from 'passport-google-oauth20';
 import { Strategy as GitHubStrategy } from 'passport-github2';
 import crypto from 'node:crypto';
 import { db } from '../prisma/db.ts';
+import { provisionDefaultGroups } from '../services/seed.service.js';
 
 export function configurePassport() {
   const googleClientId = process.env.GOOGLE_CLIENT_ID;
@@ -54,11 +55,13 @@ export function configurePassport() {
                 createdById: user.id,
               });
 
-              await db.orm.public.OrganizationMember.create({
+              const member = await db.orm.public.OrganizationMember.create({
                 orgId: org.id,
                 userId: user.id,
                 status: 'ACTIVE',
               });
+
+              await provisionDefaultGroups(org.id, member.id);
             }
 
             await db.orm.public.OAuthAccount.create({
@@ -128,11 +131,13 @@ export function configurePassport() {
                 createdById: user.id,
               });
 
-              await db.orm.public.OrganizationMember.create({
+              const member = await db.orm.public.OrganizationMember.create({
                 orgId: org.id,
                 userId: user.id,
                 status: 'ACTIVE',
               });
+
+              await provisionDefaultGroups(org.id, member.id);
             }
 
             await db.orm.public.OAuthAccount.create({

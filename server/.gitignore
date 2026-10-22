@@ -1,0 +1,11 @@
+node_modules/
+dist/
+.env
+*.docx
+readmes/
+node_modules/
+*.env
+generated/
+pem/
+.github/a
+prisma-8.md
