@@ -6,8 +6,8 @@ export function OAuthButtons({ onOAuthStart }) {
       onOAuthStart(provider);
       return;
     }
-    // Direct redirect to backend oauth endpoints
-    window.location.href = `/auth/${provider}`;
+    const backendUrl = import.meta.env.VITE_API_BACKEND_URL || import.meta.env.VITE_API_BASE_URL || 'http://localhost:3000';
+    window.location.href = `${backendUrl}/auth/${provider}`;
   };
 
   return (

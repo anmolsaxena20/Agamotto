@@ -1,9 +1,9 @@
-﻿/**
+/**
  * Eye of Agamotto Authentication Service
  * Communicates with Agamotto Express Server /auth endpoints
  */
 
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || '';
+const API_BASE_URL = import.meta.env.VITE_API_BACKEND_URL || import.meta.env.VITE_API_BASE_URL || '';
 
 // Mode setting: stored in localStorage or default to auto-fallback
 let isMockMode = localStorage.getItem('agamotto_mock_mode') === 'true';

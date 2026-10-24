@@ -1,4 +1,4 @@
-﻿import React, { useState } from 'react';
+import React, { useState } from 'react';
 import { EyeLogo } from '../../components/EyeLogo.jsx';
 import { LoginForm } from './LoginForm.jsx';
 import { SignupForm } from './SignupForm.jsx';
@@ -15,9 +15,16 @@ import {
   Zap,
   CheckCircle2,
 } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
 
-export function AuthPage() {
-  const [mode, setMode] = useState('login'); // 'login' | 'signup'
+export function AuthPage({ onAuthSuccess, initialMode = 'login' }) {
+  const navigate = useNavigate();
+  const [mode, setMode] = useState(initialMode); // 'login' | 'signup'
+
+  React.useEffect(() => {
+    if (initialMode) setMode(initialMode);
+  }, [initialMode]);
+
   const [otpModalState, setOtpModalState] = useState(null); // { email, name, expiresAt, isDemo }
   const [isForgotPasswordOpen, setIsForgotPasswordOpen] = useState(false);
   const [currentUser, setCurrentUser] = useState(null);
@@ -63,6 +70,8 @@ export function AuthPage() {
         },
       });
       setOtpModalState(null);
+      onAuthSuccess?.(res.user);
+      navigate('/dashboard');
     } catch (err) {
       setOtpError(err.message || 'Invalid or expired verification code');
     } finally {
@@ -153,18 +162,26 @@ export function AuthPage() {
         </div>
 
         <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-          <StatusBadge status="ok" label="Backend Live (:3000)" size="sm" />
-          <div
+          <button
+            type="button"
+            onClick={() => navigate('/')}
             style={{
-              fontSize: '11px',
-              fontFamily: 'var(--font-mono)',
+              background: 'none',
+              border: 'none',
               color: 'var(--text-muted)',
-              borderLeft: '1px solid var(--border)',
-              paddingLeft: '12px',
+              fontSize: '13px',
+              fontWeight: 500,
+              cursor: 'pointer',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '6px',
+              transition: 'color 0.15s ease',
             }}
+            onMouseEnter={(e) => (e.currentTarget.style.color = 'var(--text)')}
+            onMouseLeave={(e) => (e.currentTarget.style.color = 'var(--text-muted)')}
           >
-            Port :5173
-          </div>
+            &larr; Back to Home
+          </button>
         </div>
       </header>
 
@@ -227,7 +244,7 @@ export function AuthPage() {
                     color: 'var(--text)',
                   }}
                 >
-                  All-Seeing Distributed Telemetry & Live Trace Analysis
+                  Distributed Telemetry &amp; Trace Intelligence
                 </h1>
 
                 <p className="text-body" style={{ color: 'var(--text-secondary)', fontSize: '15px', lineHeight: 1.6 }}>
@@ -419,6 +436,8 @@ export function AuthPage() {
                       user: data.user,
                       organization: data.organization || { name: `${data.user.name || 'Personal'}'s Org` },
                     });
+                    onAuthSuccess?.(data.user);
+                    navigate('/dashboard');
                   }}
                 />
               ) : (
