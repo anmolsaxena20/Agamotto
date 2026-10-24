@@ -10,62 +10,40 @@ Agamotto is structured as a distributed microservices platform built for high th
 
 ```mermaid
 flowchart TD
-    ClientApps[Client Applications / Node SDK] -->|OTLP over gRPC :443| Nginx[Nginx Reverse Proxy & TLS]
-    Nginx -->|gRPC pass-through :4317| IngestGateway[Ingestion Gateway]
+    ClientApps[Client Applications / Node SDK] -->|OTLP gRPC :4317| IngestGateway[Ingestion Gateway :4317 / :4318]
+    IngestGateway -->|ClickHouse Protocol| ClickHouse[(ClickHouse Columnar DB)]
     
-    WebBrowser[Web Dashboard / UI] -->|HTTPS :443| Server[Core API Server :3000]
-    Server -->|gRPC :5000| EmailService[Email Service]
+    WebBrowser[Web Dashboard / UI] -->|HTTPS :3000| Server[Core API Server :3000]
+    Server -->|gRPC :5000| EmailService[Email Service :5000]
     Server -->|ORM Builder| NeonDB[(Neon PostgreSQL)]
+    Server -->|Internal HTTP Analytics Proxy| IngestGateway
     
     EmailService -->|REST API| Resend[Resend Email Provider]
 ```
 
 ---
 
-## Services & Components
+## Microservices & Observability Core
 
-### 1. Core API Server (`server/`)
-The primary application control plane providing multi-tenant authentication, organization lifecycle management, AWS-style role-based access control (RBAC), and ingest key management.
+All microservices (`server`, `email-service`, `ingestion-gateway`) are natively instrumented with OpenTelemetry SDK v3, featuring:
 
-- **Technology**: Node.js (ES Modules, Node 22+ type stripping), Express 5, Prisma 8 ORM (`@prisma/orm-postgres`).
-- **Database**: Serverless PostgreSQL (Neon) with strictly UUID-based relational models.
-- **Authentication**:
-  - Email & password signup with bcrypt password hashing and client-side password confirmation verification.
-  - One-time password (OTP) verification delivered via the gRPC email microservice.
-  - Refresh token rotation with SHA-256 token hashing and session persistence (`UserSession`).
-  - Google and GitHub OAuth 2.0 integrations via Passport strategies.
-  - Dual HTTP-only cookie and Authorization Bearer header support.
-- **Multi-Tenant RBAC & Groups**:
-  - Granular permissions model across 5 categories (`ORGANIZATION`, `MEMBERS`, `GROUPS`, `INGEST_KEYS`, `TELEMETRY`).
-  - Automated provisioning of 4 system groups (`SUPER_ADMIN`, `ADMIN`, `DEVELOPER`, `VIEWER`) on organization creation.
-  - Member assignment to multiple groups with dynamic permission union resolution.
-  - Wildcard full administrative override for members in `SUPER_ADMIN`.
-  - Built-in safeguards preventing removal of the organization creator or last Super Admin.
-- **Telemetry Ingest Key Management**:
-  - Secure random key generation (`ak_live_<random_bytes>`).
-  - SHA-256 one-way hashing: raw secret keys are returned only once upon creation.
-  - Fast prefix identification (`ak_live_...`) and instant key deactivation / revocation.
+### 1. System & Runtime Observable Gauges
+Scraped every 60 seconds via `PeriodicExportingMetricReader` and written to ClickHouse's `metric_samples` table:
+* `process.memory.usage` (Bytes): Labeled with `memory.type` (`heap_used`, `heap_total`, `rss`, `system_used`, `system_total`).
+* `process.cpu.utilization` (Percent): Delta CPU usage normalized across total machine cores (`0.00%` - `100.00%`).
 
-### 2. Email Microservice (`email-service/`)
-A dedicated high-performance internal microservice handling transactional email dispatching.
+### 2. Auto-Instrumentation & Application Metrics
+* **Auto-Instrumentation**: Configured with `@opentelemetry/auto-instrumentations-node` for automatic Express, HTTP, and gRPC tracking.
+* **Request Counters & Latencies**:
+  * `http.server.request.count` & `http.server.request.duration` (ms) on all incoming HTTP endpoints.
+  * `rpc.server.request.count` & `rpc.server.duration` (ms) on all incoming gRPC endpoints.
+  * `rpc.client.request.count` & `rpc.client.duration` (ms) on outbound gRPC calls.
+  * `email.sent.count` & `email.failure.count` on transactional email dispatch.
 
-- **Technology**: Node.js, `@grpc/grpc-js`, `@grpc/proto-loader`, Resend API.
-- **Interface**: gRPC `EmailService` with `SendEmail` RPC listening on port `5000`.
-- **Templates**: Custom HTML templates for OTP verification, password resets, and organization invites.
-
-### 3. Telemetry Ingestion Gateway (`ingestion-gateway/`)
-High-throughput telemetry receiver handling OpenTelemetry Protocol (OTLP) data streams.
-
-- **Technology**: Node.js / Docker.
-- **Protocol**: OTLP over gRPC listening on port `4317`.
-- **Network & TLS**: Nginx reverse proxy terminating HTTP/2 and gRPC on port `443` with Let's Encrypt TLS certificates for `ingest.agamotto.tech`.
-
-### 4. CI/CD & Deployment Automation (`.github/workflows/`)
-Production-grade deployment pipelines running on push to `main` / `feature-backend`:
-
-- `deploy-server.yml`: Automated testing, Docker image packaging, SSH deployment to VM, zero-downtime container rollout, and `/healthz` probing.
-- `deploy-email-service.yml`: Builds and rolls out the gRPC email microservice with health checks.
-- `deploy-ingestion-gateway.yml`: Deploys the ingestion gateway service with port 4317 exposure.
+### 3. Correlated Structured Logging
+* **Automatic Trace Context Correlation**: Active trace context (`trace_id`, `span_id`) is automatically injected into all log entries.
+* **Console Interception**: `startTelemetry()` hooks global `console.log`, `console.info`, `console.warn`, and `console.error` to stream all console outputs directly to ClickHouse's `telemetry_logs` table while preserving stdout.
+* **Structured Logger**: `logger(serviceName)` provides custom structured attributes for domain events.
 
 ---
 
@@ -111,7 +89,7 @@ Production-grade deployment pipelines running on push to `main` / `feature-backe
 | `POST` | `/orgs/:orgId/groups` | `groups:manage` | Create custom organization group |
 | `GET` | `/orgs/:orgId/groups/:groupId` | `groups:read` | Get group details with permissions and members |
 | `PATCH` | `/orgs/:orgId/groups/:groupId` | `groups:manage` | Update group name or description |
-| `DELETE` | `/orgs/:orgId/groups/:groupId` | `groups:manage` | Delete custom group (system groups protected) |
+| `DELETE` | `/orgs/:orgId/groups/:groupId` | `groups:manage` | Delete custom group |
 | `POST` | `/orgs/:orgId/groups/:groupId/permissions` | `groups:assign_permissions` | Assign permission to group |
 | `DELETE` | `/orgs/:orgId/groups/:groupId/permissions/:permId` | `groups:assign_permissions` | Remove permission from group |
 | `POST` | `/orgs/:orgId/groups/:groupId/members` | `groups:assign_members` | Assign member to group |
@@ -127,12 +105,68 @@ Production-grade deployment pipelines running on push to `main` / `feature-backe
 
 ---
 
+## Analytics & Observability Engine (`/analytics` or `/orgs/:orgId/analytics`)
+
+Dedicated analytics control plane querying ClickHouse columnar datasets. All endpoints require `org:read` permission. The organization ID can be supplied in route path (`/orgs/:orgId/analytics/...`), query string (`?orgId=...`), or header (`x-org-id` / `x-organization-id`).
+
+### Global Analytics
+| Method | Endpoint | Query Parameters | Description |
+|---|---|---|---|
+| `GET` | `/analytics/overview` | `since`, `until` | High-level system KPI card (total spans, requests, error rate, p50, p95, p99, active services) |
+| `GET` | `/analytics/latency` | `since`, `until`, `service` | Detailed latency percentiles per microservice (p50, p90, p95, p99, p99.9, avg, min, max) |
+| `GET` | `/analytics/latency/timeseries` | `since`, `until`, `service` | Minute-by-minute timeseries of p50, p95, p99 latency per service |
+| `GET` | `/analytics/throughput` | `since`, `until`, `service` | Minute-by-minute request volume and Requests Per Second (RPS) per service |
+| `GET` | `/analytics/endpoints` | `since`, `until`, `service`, `page`, `limit` | Paginated route-level breakdown with call count, error count, error rate, p50, p95, and p99 ms |
+| `GET` | `/analytics/services` | `since`, `until` | Service overview ranking services by errors, call volume, and p99 latency |
+| `GET` | `/analytics/dependency-graph` | `since`, `until` | Distributed service caller -> callee dependency graph with call volume, error count, and edge p99 latency |
+| `GET` | `/analytics/errors` | `since`, `until`, `service`, `page`, `limit` | Paginated error aggregates grouped by service and endpoint with last-seen timestamps |
+| `GET` | `/analytics/logs` | `since`, `until`, `regex`, `search`, `severity`, `service`, `traceId`, `page`, `limit` | Paginated log search with ReDoS-safe regex matching and severity filtering |
+| `GET` | `/analytics/metrics` | `since`, `until`, `name`, `service` | Timeseries metric points (avg, min, max, sample count) from `metric_samples` |
+| `GET` | `/analytics/resources/overview` | `since`, `until` | Current snapshot of CPU % utilization and memory consumption (heap, RSS, OS) across microservices |
+| `GET` | `/analytics/resources/cpu` | `since`, `until`, `service` | Timeseries of CPU % utilization (avg, peak, p95) per service |
+| `GET` | `/analytics/resources/memory` | `since`, `until`, `service` | Timeseries of heap used, total heap, RSS, and OS memory consumption per service |
+| `GET` | `/analytics/email-metrics` | `since`, `until` | Email delivery statistics (total sent vs. failed, broken down by template and failure reason) |
+| `GET` | `/analytics/traces` | `since`, `until`, `service`, `status`, `minDurationMs`, `page`, `limit` | Paginated distributed trace search |
+| `GET` | `/analytics/traces/:traceId` | N/A | Chronological flat list of all spans within a distributed trace |
+| `GET` | `/analytics/trace-flow/:traceId` | N/A | Hierarchical parent-child tree structure for trace waterfall visualization |
+
+### Nested Per-Microservice Exploration
+Deep-dive telemetry scoped strictly to a single selected microservice:
+
+| Method | Endpoint | Query Parameters | Description |
+|---|---|---|---|
+| `GET` | `/analytics/services/:serviceName/overview` | `since`, `until` | Service health card (total spans, requests, error rate, p50, p95, p99, avg, min, max) |
+| `GET` | `/analytics/services/:serviceName/endpoints` | `since`, `until`, `page`, `limit` | Paginated breakdown of all routes within this microservice |
+| `GET` | `/analytics/services/:serviceName/traces` | `since`, `until`, `status`, `minDurationMs`, `page`, `limit` | Paginated traces that executed through this microservice |
+| `GET` | `/analytics/services/:serviceName/logs` | `since`, `until`, `regex`, `search`, `severity`, `page`, `limit` | Paginated logs emitted by this microservice with regex search |
+| `GET` | `/analytics/services/:serviceName/metrics` | `since`, `until`, `name` | Timeseries metrics emitted by this microservice |
+| `GET` | `/analytics/services/:serviceName/errors` | `since`, `until`, `page`, `limit` | Paginated errors originating from this microservice |
+
+### Pagination Standard
+All paginated endpoints accept `page` (default: `1`) and `limit` (default: `50`, max: `200`) and return:
+```json
+{
+  "data": [ ... ],
+  "pagination": {
+    "page": 1,
+    "limit": 50,
+    "hasMore": true
+  },
+  "meta": {
+    "duration_ms": 12.4
+  }
+}
+```
+
+---
+
 ## Local Development Setup
 
 ### Prerequisites
 - Node.js v22+
 - Docker and Docker Compose
 - Access to a PostgreSQL instance (or Neon connection string)
+- Access to a ClickHouse instance
 
 ### Environment Variables
 Configure `.env` files for each service:
@@ -146,10 +180,10 @@ JWT_SECRET="<your-access-token-secret>"
 JWT_REFRESH_SECRET="<your-refresh-token-secret>"
 EMAIL_SERVICE_HOST="localhost"
 EMAIL_SERVICE_PORT=5000
-GOOGLE_CLIENT_ID="<client-id>"
-GOOGLE_CLIENT_SECRET="<client-secret>"
-GITHUB_CLIENT_ID="<client-id>"
-GITHUB_CLIENT_SECRET="<client-secret>"
+OTEL_EXPORTER_OTLP_ENDPOINT="localhost:4317"
+AGAMOTTO_API_KEY="<your-ingestion-key>"
+ANALYTICS_GATEWAY_URL="http://localhost:4318"
+ANALYTICS_INTERNAL_TOKEN="<shared-internal-token>"
 ```
 
 ### Running Locally
@@ -159,23 +193,15 @@ GITHUB_CLIENT_SECRET="<client-secret>"
    npm install
    npm start
    ```
-2. Start the API Server:
+2. Start the Telemetry Ingestion Gateway:
+   ```bash
+   cd ingestion-gateway
+   npm install
+   npm start
+   ```
+3. Start the API Server:
    ```bash
    cd server
    npm install
    npm start
    ```
-3. Start the Ingestion Gateway:
-   ```bash
-   cd ingestion-gateway
-   docker build -t ingestion-gateway .
-   docker run -p 4317:4317 ingestion-gateway
-   ```
-
----
-
-## Testing & Quality Assurance
-- Automated endpoint test suite covering Organization lifecycle, member invitations, custom groups, permission grants, and key revocation:
-  - Verified 22/22 routes passing against active database instances.
-- Zero-comments coding policy enforced across core server and business logic modules.
-- Strict error propagation delegating all asynchronous controller rejections to Express `next(error)` handlers.

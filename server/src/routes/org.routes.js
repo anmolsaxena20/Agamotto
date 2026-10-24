@@ -28,7 +28,6 @@ import {
   toggleKey,
   revokeKey,
 } from '../controllers/ingestKey.controller.js';
-import { latency, dependencyGraph, serviceOverview, errors, logs, metrics, trace, traceFlow } from '../controllers/analytics.controller.js';
 
 const router = Router();
 
@@ -60,13 +59,5 @@ router.get('/:orgId/keys', requirePermission('ingest_keys:read'), listKeys);
 router.post('/:orgId/keys', requirePermission('ingest_keys:create'), createKey);
 router.patch('/:orgId/keys/:keyId', requirePermission('ingest_keys:revoke'), toggleKey);
 router.delete('/:orgId/keys/:keyId', requirePermission('ingest_keys:revoke'), revokeKey);
-router.get('/:orgId/analytics/latency', requirePermission('org:read'), latency);
-router.get('/:orgId/analytics/dependency-graph', requirePermission('org:read'), dependencyGraph);
-router.get('/:orgId/analytics/services', requirePermission('org:read'), serviceOverview);
-router.get('/:orgId/analytics/errors', requirePermission('org:read'), errors);
-router.get('/:orgId/analytics/logs', requirePermission('org:read'), logs);
-router.get('/:orgId/analytics/metrics', requirePermission('org:read'), metrics);
-router.get('/:orgId/analytics/traces/:traceId', requirePermission('org:read'), trace);
-router.get('/:orgId/analytics/trace-flow/:traceId', requirePermission('org:read'), traceFlow);
 
 export default router;

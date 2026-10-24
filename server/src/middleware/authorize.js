@@ -3,7 +3,7 @@ import { hasPermission } from '../services/rbac.service.js';
 
 export async function requireOrgMember(req, res, next) {
   try {
-    const orgId = req.params.orgId || req.headers['x-org-id'];
+    const orgId = req.params.orgId || req.query.orgId || req.headers['x-org-id'] || req.headers['x-organization-id'];
 
     if (!orgId) {
       return res.status(400).json({ error: 'Organization ID is required' });
