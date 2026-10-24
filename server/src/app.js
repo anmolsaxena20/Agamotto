@@ -9,9 +9,11 @@ import orgRoutes from './routes/org.routes.js';
 import permissionRoutes from './routes/permission.routes.js';
 import internalRoutes from './routes/internal.routes.js';
 import { errorHandler } from './middleware/errorHandler.js';
+import { logger } from './observability/index.js';
 
 export function createApp() {
   const app = express();
+  const log = logger('server');
   const tracer = trace.getTracer('server.http');
   const meter = metrics.getMeter('server.http');
   const requestCounter = meter.createCounter('http.server.request.count');
@@ -22,12 +24,18 @@ export function createApp() {
     const span = tracer.startSpan(`${req.method} ${req.path}`, { kind: SpanKind.SERVER }, parent);
     const started = performance.now();
     res.once('finish', () => {
+      const elapsed = performance.now() - started;
       const attributes = { 'http.request.method': req.method, 'http.response.status_code': res.statusCode, 'url.path': req.route?.path || req.path };
       requestCounter.add(1, attributes);
-      duration.record(performance.now() - started, attributes);
+      duration.record(elapsed, attributes);
       span.setAttribute('http.response.status_code', res.statusCode);
       if (res.statusCode >= 500) span.setStatus({ code: 2 });
       span.end();
+      const severity = res.statusCode >= 500 ? 'ERROR' : res.statusCode >= 400 ? 'WARN' : 'INFO';
+      log(severity, `${req.method} ${req.originalUrl || req.path} ${res.statusCode} ${elapsed.toFixed(1)}ms`, {
+        ...attributes,
+        duration_ms: Number(elapsed.toFixed(2)),
+      });
     });
     context.with(trace.setSpan(parent, span), next);
   });
