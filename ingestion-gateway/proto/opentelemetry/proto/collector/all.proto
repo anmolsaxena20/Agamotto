@@ -1,0 +1,7 @@
+syntax = "proto3";
+
+package opentelemetry.proto.collector;
+
+import "opentelemetry/proto/collector/trace/v1/trace_service.proto";
+import "opentelemetry/proto/collector/metrics/v1/metrics_service.proto";
+import "opentelemetry/proto/collector/logs/v1/logs_service.proto";

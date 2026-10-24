@@ -1,8 +1,6 @@
-# Temporary telemetry receiver
+# Telemetry Ingestion Gateway
 
-The gRPC receiver implements the exact custom `AgamottoIngestion` contract
-used by the three services. It requires `x-api-key` metadata and validates it
-through the control plane before it writes a batch.
+The gRPC receiver implements standard OpenTelemetry v1 `TraceService`, `MetricsService`, and `LogsService`. It requires `x-api-key` metadata and validates it through the control plane before it writes a batch.
 
 `CLICKHOUSE_CLOUD_API_KEY` and `CLICKHOUSE_CLOUD_API_SECRET` are Cloud control
 plane credentials, not ClickHouse data-plane credentials. Configure
