@@ -93,10 +93,32 @@ function onRefreshFailed(error) {
  */
 export async function apiRequest(endpoint, options = {}, isRetry = false) {
   const url = `${API_BASE_URL}${endpoint}`;
+  const method = (options.method || 'GET').toUpperCase();
   const headers = {
-    'Content-Type': 'application/json',
     ...(options.headers || {}),
   };
+
+  if (options.body && !headers['Content-Type'] && typeof options.body === 'string') {
+    headers['Content-Type'] = 'application/json';
+  }
+
+  // Automatically inject x-org-id header to guarantee backend authorize middleware resolves orgId
+  const orgMatch = endpoint.match(/\/orgs\/([^/?#]+)/);
+  if (orgMatch && orgMatch[1] && orgMatch[1] !== 'analytics') {
+    headers['x-org-id'] = orgMatch[1];
+    headers['x-organization-id'] = orgMatch[1];
+  } else if (!headers['x-org-id'] && typeof window !== 'undefined') {
+    const savedOrg = localStorage.getItem('agamotto_current_org');
+    if (savedOrg) {
+      try {
+        const parsed = JSON.parse(savedOrg);
+        if (parsed?.id) {
+          headers['x-org-id'] = parsed.id;
+          headers['x-organization-id'] = parsed.id;
+        }
+      } catch (e) {}
+    }
+  }
 
   const token = getAccessToken();
   if (token && !headers['Authorization']) {

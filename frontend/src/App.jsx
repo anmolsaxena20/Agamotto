@@ -7,6 +7,7 @@ import { OrgProvider } from './context/OrgContext.jsx';
 // Pages
 import { LandingPage } from './features/landing/LandingPage.jsx';
 import { AuthPage } from './features/auth/AuthPage.jsx';
+import { OAuthCallbackPage } from './features/auth/OAuthCallbackPage.jsx';
 import { NotFoundPage } from './features/misc/NotFoundPage.jsx';
 
 // Layout & Components
@@ -214,7 +215,10 @@ export default function App() {
               element={<AuthRouteWrapper initialMode="signup" />}
             />
 
-            {/* 3. Protected Dashboard Routes */}
+            {/* 3. OAuth Callback Route */}
+            <Route path="/auth/callback" element={<OAuthCallbackPage />} />
+
+            {/* 4. Protected Dashboard Routes */}
             <Route path="/dashboard" element={<Navigate to="/dashboard/overview" replace />} />
             <Route path="/dashboard/:tab" element={<DashboardShell />} />
 
