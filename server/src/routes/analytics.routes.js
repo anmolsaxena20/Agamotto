@@ -27,7 +27,7 @@ import {
   getServiceErrors,
 } from '../controllers/analytics.controller.js';
 
-const router = Router();
+const router = Router({ mergeParams: true });
 
 router.use(authenticate);
 router.use(requirePermission('org:read'));
