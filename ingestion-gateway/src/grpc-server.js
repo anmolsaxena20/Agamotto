@@ -3,12 +3,11 @@ import { fileURLToPath } from 'node:url';
 import { readFileSync } from 'node:fs';
 import grpc from '@grpc/grpc-js';
 import protoLoader from '@grpc/proto-loader';
-import { decodeTraceSpans } from './otlp-trace-decoder.js';
-import { decodeLogRecords } from './otlp-log-decoder.js';
-import { decodeMetricSamples } from './otlp-metric-decoder.js';
+import { mapOtlpTraces, mapOtlpLogs, mapOtlpMetrics } from './otlp-mapper.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
-const PROTO_PATH = path.resolve(__dirname, '..', 'proto', 'agamotto_telemetry.proto');
+const PROTO_DIR = path.resolve(__dirname, '..', 'proto');
+const PROTO_PATH = path.resolve(PROTO_DIR, 'opentelemetry', 'proto', 'collector', 'all.proto');
 
 function apiKey(call) {
   const values = call.metadata.get('x-api-key');
@@ -16,31 +15,48 @@ function apiKey(call) {
 }
 
 export function createIngestionGrpcServer({ store, validateKey }) {
-  const definition = protoLoader.loadSync(PROTO_PATH, { keepCase: true, longs: String, enums: String, defaults: true, oneofs: true });
+  const definition = protoLoader.loadSync(PROTO_PATH, {
+    includeDirs: [PROTO_DIR],
+    keepCase: true,
+    longs: String,
+    enums: String,
+    defaults: true,
+    oneofs: true,
+  });
   const descriptor = grpc.loadPackageDefinition(definition);
   const server = new grpc.Server();
-  const handle = signal => async (call, callback) => {
+
+  const handleStandardExport = (signal, mapper, writer) => async (call, callback) => {
     try {
       const organizationId = await validateKey(apiKey(call));
-      if (!organizationId) return callback({ code: grpc.status.UNAUTHENTICATED, message: 'Invalid ingestion key' });
-      const payload = call.request.otlp_export_request;
-      if (!(payload instanceof Uint8Array) || payload.length === 0) return callback({ code: grpc.status.INVALID_ARGUMENT, message: 'Missing OTLP export request payload' });
-      if (payload.length > Number.parseInt(process.env.MAX_OTLP_BATCH_BYTES || '4194304', 10)) return callback({ code: grpc.status.RESOURCE_EXHAUSTED, message: 'OTLP batch exceeds configured limit' });
-      await store.writeBatch({ organizationId, signal, payload });
-      if (signal === 'traces') await store.writeTraceSpans(organizationId, decodeTraceSpans(payload));
-      if (signal === 'logs') await store.writeLogs(organizationId, decodeLogRecords(payload));
-      if (signal === 'metrics') await store.writeMetricSamples(organizationId, decodeMetricSamples(payload));
-      return callback(null, {});
-    } catch (error) {
-      // Deliberately never include payloads, API keys, or database credentials.
+      if (!organizationId) {
+        return callback({ code: grpc.status.UNAUTHENTICATED, message: 'Invalid ingestion key' });
+      }
+
+      const rows = mapper(call.request);
+      const rawPayload = Buffer.from(JSON.stringify(call.request));
+      await store.writeBatch({ organizationId, signal, payload: rawPayload });
+      if (rows.length > 0) {
+        await writer(organizationId, rows);
+      }
+      return callback(null, { partial_success: null });
+    } catch {
       return callback({ code: grpc.status.UNAVAILABLE, message: 'Telemetry storage is temporarily unavailable' });
     }
   };
-  server.addService(descriptor.agamotto.telemetry.AgamottoIngestion.service, {
-    ExportTraces: handle('traces'),
-    ExportMetrics: handle('metrics'),
-    ExportLogs: handle('logs'),
+
+  server.addService(descriptor.opentelemetry.proto.collector.trace.v1.TraceService.service, {
+    Export: handleStandardExport('traces', mapOtlpTraces, store.writeTraceSpans),
   });
+
+  server.addService(descriptor.opentelemetry.proto.collector.metrics.v1.MetricsService.service, {
+    Export: handleStandardExport('metrics', mapOtlpMetrics, store.writeMetricSamples),
+  });
+
+  server.addService(descriptor.opentelemetry.proto.collector.logs.v1.LogsService.service, {
+    Export: handleStandardExport('logs', mapOtlpLogs, store.writeLogs),
+  });
+
   return server;
 }
 
