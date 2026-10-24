@@ -42,7 +42,7 @@ export function AuthPage({ onAuthSuccess, initialMode = 'login' }) {
           setCurrentUser({
             user: {
               id: 'usr-new-001',
-              name: otpModalState.name || 'Agamotto Sorcerer',
+              name: otpModalState.name || 'Site Reliability Engineer',
               email: otpModalState.email,
               avatarUrl: null,
               isEmailVerified: true,

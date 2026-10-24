@@ -74,7 +74,7 @@ export function SignupForm({
       if (err.isOffline) {
         // Allow developer preview even if backend is offline
         setError(
-          'Backend offline on localhost:3000. Start server or click "Preview Verification" below.'
+          'Backend API unreachable. Ensure backend service is running or preview verification flow.'
         );
       } else {
         setError(err.message || 'Registration failed. Please try another email.');
@@ -122,7 +122,7 @@ export function SignupForm({
           <AlertCircle size={16} style={{ flexShrink: 0, marginTop: '2px' }} />
           <div>
             <span>{error}</span>
-            {error.includes('offline') && (
+            {error.includes('unreachable') && (
               <div style={{ marginTop: '6px' }}>
                 <button
                   type="button"
@@ -152,7 +152,7 @@ export function SignupForm({
           <Input
             label="Full Name"
             name="name"
-            placeholder="Stephen Strange"
+            placeholder="Alex Morgan"
             icon={User}
             value={formData.name}
             onChange={handleChange}

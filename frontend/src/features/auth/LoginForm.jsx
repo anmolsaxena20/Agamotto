@@ -33,7 +33,7 @@ export function LoginForm({
       if (err.isOffline) {
         // Fallback demo simulation if server is offline so user can preview immediately!
         setError(
-          'Backend offline on localhost:3000. Start the server (npm run dev inside Agamotto/server) or click "Demo Sign In" below.'
+          'Backend API unreachable. Ensure backend service is running or preview with demo account.'
         );
       } else {
         setError(err.message || 'Login failed. Please check your credentials.');
@@ -48,15 +48,15 @@ export function LoginForm({
       message: 'Demo Login Successful',
       user: {
         id: 'usr-agamotto-demo',
-        name: 'Doctor Strange (Demo)',
-        email: email || 'sorcerer.supreme@agamotto.dev',
+        name: 'Lead SRE (Demo)',
+        email: email || 'sre-lead@agamotto.dev',
         avatarUrl: null,
         isEmailVerified: true,
       },
       organization: {
-        id: 'org-kamar-taj',
-        name: "Doctor Strange's Org",
-        slug: 'kamar-taj',
+        id: 'org-core-infra',
+        name: 'Core Infrastructure Grid',
+        slug: 'core-infra',
       },
     });
   };

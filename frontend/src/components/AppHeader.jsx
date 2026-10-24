@@ -395,7 +395,7 @@ export function AppHeader({ onNavigate }) {
 
           <Input
             label="Organization Name"
-            placeholder="e.g. Kamar-Taj Telemetry Grid"
+            placeholder="e.g. Core Observability Grid"
             value={newOrgName}
             onChange={(e) => {
               setNewOrgName(e.target.value);
@@ -409,7 +409,7 @@ export function AppHeader({ onNavigate }) {
 
           <Input
             label="Slug Identifier"
-            placeholder="e.g. kamar-taj"
+            placeholder="e.g. core-observability"
             value={newOrgSlug}
             onChange={(e) => setNewOrgSlug(e.target.value)}
             helper="Used in URL namespaces and telemetry partition keys"

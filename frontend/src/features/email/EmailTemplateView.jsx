@@ -5,7 +5,7 @@ import { Input } from '../../components/Input.jsx';
 import { Copy, Check, Code, Eye, RefreshCw } from 'lucide-react';
 
 export function EmailTemplateView() {
-  const [userName, setUserName] = useState('Doctor Strange');
+  const [userName, setUserName] = useState('Alex Morgan');
   const [otpCode, setOtpCode] = useState('782941');
   const [verifyUrl, setVerifyUrl] = useState('https://agamotto.io/verify?otp=782941');
   const [companyName, setCompanyName] = useState('Agamotto Telemetry');

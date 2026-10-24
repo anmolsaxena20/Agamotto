@@ -241,8 +241,8 @@ function getSimulatedFallback(endpoint, options) {
     setAccessToken(token);
     const userObj = {
       id: 'usr_agamotto_admin',
-      name: body.email ? body.email.split('@')[0] : 'Sorcerer Developer',
-      email: body.email || 'sorcerer@agamotto.io',
+      name: body.email ? body.email.split('@')[0] : 'Platform Engineer',
+      email: body.email || 'engineer@agamotto.io',
       avatarUrl: null,
       isEmailVerified: true,
     };
@@ -266,18 +266,18 @@ function getSimulatedFallback(endpoint, options) {
     return {
       organizations: [
         {
-          id: 'org_kamar_taj',
-          name: 'Kamar-Taj Telemetry Grid',
-          slug: 'kamar-taj',
+          id: 'org_core_infra',
+          name: 'Core Infrastructure Grid',
+          slug: 'core-infra',
           role: 'OWNER',
           memberCount: 6,
           keyCount: 4,
           createdAt: '2026-01-15T10:00:00Z',
         },
         {
-          id: 'org_sanctum_sanctorum',
-          name: 'Sanctum Sanctorum NY',
-          slug: 'sanctum-ny',
+          id: 'org_edge_cluster',
+          name: 'Edge Ingestion Cluster',
+          slug: 'edge-cluster',
           role: 'ADMIN',
           memberCount: 3,
           keyCount: 2,
@@ -302,9 +302,9 @@ function getSimulatedFallback(endpoint, options) {
   if (endpoint.match(/^\/orgs\/[^/]+$/) && method === 'GET') {
     return {
       organization: {
-        id: 'org_kamar_taj',
-        name: 'Kamar-Taj Telemetry Grid',
-        slug: 'kamar-taj',
+        id: 'org_core_infra',
+        name: 'Core Infrastructure Grid',
+        slug: 'core-infra',
         role: 'OWNER',
         createdAt: '2026-01-15T10:00:00Z',
       },
@@ -318,8 +318,8 @@ function getSimulatedFallback(endpoint, options) {
         {
           id: 'mem_01',
           userId: 'usr_01',
-          name: 'Dr. Stephen Strange',
-          email: 'sorcerer@agamotto.io',
+          name: 'Alex Morgan',
+          email: 'alex.morgan@agamotto.io',
           role: 'OWNER',
           groups: ['Super Admins', 'Core Telemetry Operators'],
           status: 'ACTIVE',
@@ -328,8 +328,8 @@ function getSimulatedFallback(endpoint, options) {
         {
           id: 'mem_02',
           userId: 'usr_02',
-          name: 'Wong (Guardian of Kamar-Taj)',
-          email: 'wong@kamar-taj.org',
+          name: 'Jordan Lee (Principal SRE)',
+          email: 'jordan.lee@agamotto.io',
           role: 'ADMIN',
           groups: ['Core Telemetry Operators'],
           status: 'ACTIVE',
@@ -601,11 +601,11 @@ function getSimulatedFallback(endpoint, options) {
   if (endpoint.includes('/analytics/logs')) {
     return {
       data: [
-        { id: 'log_01', timestamp: new Date(Date.now() - 1000 * 12).toISOString(), service: 'server-gateway', severity: 'INFO', message: 'HTTP 200 GET /orgs/org_kamar_taj/analytics/overview 14.2ms', traceId: 'tr_7a9f82c401', spanId: 'sp_1001' },
+        { id: 'log_01', timestamp: new Date(Date.now() - 1000 * 12).toISOString(), service: 'server-gateway', severity: 'INFO', message: 'HTTP 200 GET /orgs/org_core_infra/analytics/overview 14.2ms', traceId: 'tr_7a9f82c401', spanId: 'sp_1001' },
         { id: 'log_02', timestamp: new Date(Date.now() - 1000 * 25).toISOString(), service: 'email-service', severity: 'WARN', message: 'SMTP relay delivery slow: 890ms taken to deliver OTP code', traceId: 'tr_4c2d81e905', spanId: 'sp_1002' },
         { id: 'log_03', timestamp: new Date(Date.now() - 1000 * 42).toISOString(), service: 'ingestion-gateway', severity: 'INFO', message: 'Flushed batch of 2500 spans into ClickHouse table agamotto_telemetry.trace_spans', traceId: 'tr_89ff30a112', spanId: 'sp_1003' },
         { id: 'log_04', timestamp: new Date(Date.now() - 1000 * 95).toISOString(), service: 'email-service', severity: 'ERROR', message: 'Failed to send OTP email: connect ETIMEDOUT 10.0.4.12:587', traceId: 'tr_1b83d9aa44', spanId: 'sp_1004' },
-        { id: 'log_05', timestamp: new Date(Date.now() - 1000 * 130).toISOString(), service: 'auth-service', severity: 'INFO', message: 'Issued refreshed token pair for user Dr. Stephen Strange', traceId: 'tr_98cb124ff3', spanId: 'sp_1005' },
+        { id: 'log_05', timestamp: new Date(Date.now() - 1000 * 130).toISOString(), service: 'auth-service', severity: 'INFO', message: 'Issued refreshed token pair for user Alex Morgan', traceId: 'tr_98cb124ff3', spanId: 'sp_1005' },
       ],
       pagination: { page: 1, limit: 50, hasMore: false },
     };

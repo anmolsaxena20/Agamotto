@@ -188,7 +188,7 @@ export function OrganizationsView() {
         <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
           <Input
             label="Organization Workspace Name"
-            placeholder="e.g. Sanctum Telemetry Node"
+            placeholder="e.g. Production Cluster East"
             value={formName}
             onChange={(e) => {
               setFormName(e.target.value);
@@ -202,7 +202,7 @@ export function OrganizationsView() {
 
           <Input
             label="Slug Identifier"
-            placeholder="e.g. sanctum-telemetry"
+            placeholder="e.g. prod-cluster-east"
             value={formSlug}
             onChange={(e) => setFormSlug(e.target.value)}
             helper="Telemetry partition key for ClickHouse queries"
