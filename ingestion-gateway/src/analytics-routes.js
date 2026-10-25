@@ -54,8 +54,9 @@ export function createAnalyticsHandler(store) {
 
     const requestedSince = url.searchParams.get('since');
     const requestedUntil = url.searchParams.get('until');
-    const parsedSince = requestedSince ? new Date(requestedSince) : new Date(Date.now() - 3600000);
-    const parsedUntil = requestedUntil ? new Date(requestedUntil) : new Date();
+    // Default window: last 24 hours to ensure active observability data is captured
+    const parsedSince = requestedSince ? new Date(requestedSince) : new Date(Date.now() - 86400000);
+    const parsedUntil = requestedUntil ? new Date(requestedUntil) : new Date(Date.now() + 60000);
 
     if (Number.isNaN(parsedSince.getTime()) || Number.isNaN(parsedUntil.getTime())) {
       return sendJson(res, 400, { error: 'Invalid since or until timestamp' });
@@ -109,7 +110,7 @@ export function createAnalyticsHandler(store) {
         query = `SELECT service_name, name AS endpoint, count() AS errors, any(start_time) AS last_seen, quantileTDigest(0.99)(duration_ns) / 1000000 AS p99_ms FROM ${db}.trace_spans WHERE organization_id = {organizationId:UUID} AND start_time >= {since:DateTime64(3)} AND start_time <= {until:DateTime64(3)} AND status_code = 2 ${service ? 'AND service_name = {service:String}' : ''} GROUP BY service_name, name ORDER BY errors DESC LIMIT {limit:UInt16} OFFSET {offset:UInt32}`;
       } else if (route === 'logs') {
         const regex = url.searchParams.get('regex');
-        const search = url.searchParams.get('search');
+        const search = url.searchParams.get('search') || url.searchParams.get('query');
         const severity = url.searchParams.get('severity');
         const service = url.searchParams.get('service');
         const traceId = url.searchParams.get('traceId');
@@ -120,7 +121,7 @@ export function createAnalyticsHandler(store) {
           params.pattern = regex;
         }
         if (search) params.search = search;
-        if (severity) params.severity = severity.toUpperCase();
+        if (severity && severity !== 'ALL') params.severity = severity.toUpperCase();
         if (service) params.service = service;
         if (traceId) params.traceId = traceId;
 
@@ -131,7 +132,7 @@ export function createAnalyticsHandler(store) {
         let whereExtra = '';
         if (regex) whereExtra += 'AND match(body, {pattern:String}) ';
         if (search) whereExtra += 'AND positionCaseInsensitive(body, {search:String}) > 0 ';
-        if (severity) whereExtra += 'AND severity_text = {severity:String} ';
+        if (severity && severity !== 'ALL') whereExtra += 'AND severity_text = {severity:String} ';
         if (service) whereExtra += 'AND service_name = {service:String} ';
         if (traceId) whereExtra += 'AND trace_id = {traceId:String} ';
 
@@ -143,15 +144,15 @@ export function createAnalyticsHandler(store) {
         if (service) params.service = service;
         query = `SELECT service_name, metric_name, metric_type, toStartOfMinute(time) AS timestamp, avg(value) AS avg_value, min(value) AS min_value, max(value) AS max_value, count() AS samples FROM ${db}.metric_samples WHERE organization_id = {organizationId:UUID} AND time >= {since:DateTime64(3)} AND time <= {until:DateTime64(3)} ${metric ? 'AND metric_name = {metric:String}' : ''} ${service ? 'AND service_name = {service:String}' : ''} GROUP BY service_name, metric_name, metric_type, timestamp ORDER BY timestamp ASC LIMIT 10000`;
       } else if (route === 'resources/overview') {
-        query = `SELECT service_name, metric_name, attributes_json, argMax(value, time) AS latest_value, max(time) AS last_updated FROM ${db}.metric_samples WHERE organization_id = {organizationId:UUID} AND time >= {since:DateTime64(3)} AND time <= {until:DateTime64(3)} AND metric_name IN ('process.cpu.utilization', 'process.memory.usage') GROUP BY service_name, metric_name, attributes_json ORDER BY service_name, metric_name`;
+        query = `SELECT service_name, metric_name, attributes_json, argMax(value, time) AS latest_value, max(time) AS last_updated FROM ${db}.metric_samples WHERE organization_id = {organizationId:UUID} AND time >= {since:DateTime64(3)} AND time <= {until:DateTime64(3)} AND (metric_name LIKE '%cpu%' OR metric_name LIKE '%memory%' OR metric_name LIKE '%heap%' OR metric_name LIKE '%eventloop%') GROUP BY service_name, metric_name, attributes_json ORDER BY service_name, metric_name`;
       } else if (route === 'resources/cpu') {
         const service = url.searchParams.get('service');
         if (service) params.service = service;
-        query = `SELECT service_name, toStartOfMinute(time) AS timestamp, avg(value) AS avg_cpu_pct, max(value) AS max_cpu_pct, quantileTDigest(0.95)(value) AS p95_cpu_pct FROM ${db}.metric_samples WHERE organization_id = {organizationId:UUID} AND time >= {since:DateTime64(3)} AND time <= {until:DateTime64(3)} AND metric_name = 'process.cpu.utilization' ${service ? 'AND service_name = {service:String}' : ''} GROUP BY service_name, timestamp ORDER BY timestamp ASC LIMIT 5000`;
+        query = `SELECT service_name, toStartOfMinute(time) AS timestamp, avg(value) AS avg_cpu_pct, max(value) AS max_cpu_pct, quantileTDigest(0.95)(value) AS p95_cpu_pct FROM ${db}.metric_samples WHERE organization_id = {organizationId:UUID} AND time >= {since:DateTime64(3)} AND time <= {until:DateTime64(3)} AND (metric_name = 'process.cpu.utilization' OR metric_name = 'nodejs.eventloop.utilization' OR metric_name LIKE '%cpu%') ${service ? 'AND service_name = {service:String}' : ''} GROUP BY service_name, timestamp ORDER BY timestamp ASC LIMIT 5000`;
       } else if (route === 'resources/memory') {
         const service = url.searchParams.get('service');
         if (service) params.service = service;
-        query = `SELECT service_name, attributes_json, toStartOfMinute(time) AS timestamp, avg(value) AS avg_bytes, max(value) AS max_bytes FROM ${db}.metric_samples WHERE organization_id = {organizationId:UUID} AND time >= {since:DateTime64(3)} AND time <= {until:DateTime64(3)} AND metric_name = 'process.memory.usage' ${service ? 'AND service_name = {service:String}' : ''} GROUP BY service_name, attributes_json, timestamp ORDER BY timestamp ASC LIMIT 5000`;
+        query = `SELECT service_name, attributes_json, toStartOfMinute(time) AS timestamp, avg(value) AS avg_bytes, max(value) AS max_bytes FROM ${db}.metric_samples WHERE organization_id = {organizationId:UUID} AND time >= {since:DateTime64(3)} AND time <= {until:DateTime64(3)} AND (metric_name = 'process.memory.usage' OR metric_name = 'v8js.memory.heap.used' OR metric_name LIKE '%memory%') ${service ? 'AND service_name = {service:String}' : ''} GROUP BY service_name, attributes_json, timestamp ORDER BY timestamp ASC LIMIT 5000`;
       } else if (route === 'email-metrics') {
         query = `SELECT metric_name, attributes_json, sum(value) AS total_count FROM ${db}.metric_samples WHERE organization_id = {organizationId:UUID} AND time >= {since:DateTime64(3)} AND time <= {until:DateTime64(3)} AND metric_name IN ('email.sent.count', 'email.failure.count') GROUP BY metric_name, attributes_json`;
       } else if (route === 'traces') {
