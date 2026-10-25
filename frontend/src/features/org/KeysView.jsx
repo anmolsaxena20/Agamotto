@@ -1,12 +1,21 @@
-import React, { useState, useEffect } from 'react';
-import { Card } from '../../components/Card.jsx';
-import { Button } from '../../components/Button.jsx';
-import { Input } from '../../components/Input.jsx';
-import { Modal } from '../../components/Modal.jsx';
-import { StatusBadge } from '../../components/StatusBadge.jsx';
-import { keyService } from '../../services/apiServices.js';
-import { useOrg } from '../../context/OrgContext.jsx';
-import { Key, Plus, Copy, Check, Trash2, Power, AlertTriangle, ShieldCheck } from 'lucide-react';
+import React, { useState, useEffect } from "react";
+import { Card } from "../../components/Card.jsx";
+import { Button } from "../../components/Button.jsx";
+import { Input } from "../../components/Input.jsx";
+import { Modal } from "../../components/Modal.jsx";
+import { StatusBadge } from "../../components/StatusBadge.jsx";
+import { keyService } from "../../services/apiServices.js";
+import { useOrg } from "../../context/OrgContext.jsx";
+import {
+  Key,
+  Plus,
+  Copy,
+  Check,
+  Trash2,
+  Power,
+  AlertTriangle,
+  ShieldCheck,
+} from "lucide-react";
 
 export function KeysView() {
   const { currentOrg } = useOrg();
@@ -15,7 +24,7 @@ export function KeysView() {
 
   // Create Key Modal & One-time reveal
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
-  const [keyName, setKeyName] = useState('');
+  const [keyName, setKeyName] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [createdSecret, setCreatedSecret] = useState(null);
   const [copied, setCopied] = useState(false);
@@ -27,7 +36,7 @@ export function KeysView() {
       const res = await keyService.listKeys(currentOrg.id);
       setKeys(res?.keys || []);
     } catch (err) {
-      console.warn('Failed to load keys:', err);
+      console.warn("Failed to load keys:", err);
     } finally {
       setIsLoading(false);
     }
@@ -42,12 +51,14 @@ export function KeysView() {
     if (!keyName.trim()) return;
     setIsSubmitting(true);
     try {
-      const res = await keyService.createKey(currentOrg.id, { name: keyName.trim() });
-      setCreatedSecret(res.key?.secret || `agamotto_sec_${Math.random().toString(36).slice(2)}${Math.random().toString(36).slice(2)}`);
-      setKeyName('');
+      const res = await keyService.createKey(currentOrg.id, {
+        name: keyName.trim(),
+      });
+      setCreatedSecret(res.key?.secret || res.key?.secretKey);
+      setKeyName("");
       await fetchKeys();
     } catch (err) {
-      alert(err.message || 'Failed to create ingestion key');
+      alert(err.message || "Failed to create ingestion key");
     } finally {
       setIsSubmitting(false);
     }
@@ -55,20 +66,27 @@ export function KeysView() {
 
   const handleToggleActive = async (key) => {
     try {
-      await keyService.toggleKey(currentOrg.id, key.id, { isActive: !key.isActive });
+      await keyService.toggleKey(currentOrg.id, key.id, {
+        isActive: !key.isActive,
+      });
       await fetchKeys();
     } catch (err) {
-      alert(err.message || 'Failed to toggle key status');
+      alert(err.message || "Failed to toggle key status");
     }
   };
 
   const handleRevokeKey = async (keyId) => {
-    if (!window.confirm('Are you sure you want to permanently revoke this ingestion key? Telemetry pipelines using this key will be rejected.')) return;
+    if (
+      !window.confirm(
+        "Are you sure you want to permanently revoke this ingestion key? Telemetry pipelines using this key will be rejected.",
+      )
+    )
+      return;
     try {
       await keyService.revokeKey(currentOrg.id, keyId);
       await fetchKeys();
     } catch (err) {
-      alert(err.message || 'Failed to revoke key');
+      alert(err.message || "Failed to revoke key");
     }
   };
 
@@ -79,17 +97,37 @@ export function KeysView() {
   };
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+    <div style={{ display: "flex", flexDirection: "column", gap: "24px" }}>
+      <div
+        style={{
+          display: "flex",
+          justifyContent: "space-between",
+          alignItems: "center",
+        }}
+      >
         <div>
           <h1 className="text-page-title">OTLP Ingestion API Keys</h1>
-          <p className="text-body" style={{ color: 'var(--text-secondary)', marginTop: '4px' }}>
-            API keys authenticate telemetry exporters (OTel SDK, Collector) into the ingestion gateway for{' '}
-            <strong style={{ color: 'var(--accent)' }}>{currentOrg?.name}</strong>.
+          <p
+            className="text-body"
+            style={{ color: "var(--text-secondary)", marginTop: "4px" }}
+          >
+            API keys authenticate telemetry exporters (OTel SDK, Collector) into
+            the ingestion gateway for{" "}
+            <strong style={{ color: "var(--accent)" }}>
+              {currentOrg?.name}
+            </strong>
+            .
           </p>
         </div>
 
-        <Button variant="primary" icon={Plus} onClick={() => { setCreatedSecret(null); setIsCreateModalOpen(true); }}>
+        <Button
+          variant="primary"
+          icon={Plus}
+          onClick={() => {
+            setCreatedSecret(null);
+            setIsCreateModalOpen(true);
+          }}
+        >
           Generate Ingest Key
         </Button>
       </div>
@@ -98,39 +136,53 @@ export function KeysView() {
       {createdSecret && (
         <div
           style={{
-            padding: '16px 20px',
-            backgroundColor: 'var(--surface)',
-            border: '1px solid var(--accent)',
-            borderRadius: 'var(--radius)',
-            boxShadow: '0 0 20px rgba(224, 176, 80, 0.2)',
-            display: 'flex',
-            flexDirection: 'column',
-            gap: '12px',
+            padding: "16px 20px",
+            backgroundColor: "var(--surface)",
+            border: "1px solid var(--accent)",
+            borderRadius: "var(--radius)",
+            boxShadow: "0 0 20px rgba(224, 176, 80, 0.2)",
+            display: "flex",
+            flexDirection: "column",
+            gap: "12px",
           }}
         >
-          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-            <ShieldCheck size={18} style={{ color: 'var(--accent)' }} />
-            <span style={{ fontWeight: 600, color: 'var(--accent)', fontSize: '14px' }}>
+          <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+            <ShieldCheck size={18} style={{ color: "var(--accent)" }} />
+            <span
+              style={{
+                fontWeight: 600,
+                color: "var(--accent)",
+                fontSize: "14px",
+              }}
+            >
               Ingest Key Created Successfully — Copy Secret Now
             </span>
           </div>
 
-          <p style={{ fontSize: '13px', color: 'var(--text-secondary)' }}>
-            This secret will never be shown again. Store it securely in your microservice environment or Kubernetes secrets.
+          <p style={{ fontSize: "13px", color: "var(--text-secondary)" }}>
+            This secret will never be shown again. Store it securely in your
+            microservice environment or Kubernetes secrets.
           </p>
 
           <div
             style={{
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'space-between',
-              padding: '10px 14px',
-              backgroundColor: 'var(--surface-input)',
-              borderRadius: 'var(--radius-sm)',
-              border: '1px solid var(--border)',
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "space-between",
+              padding: "10px 14px",
+              backgroundColor: "var(--surface-input)",
+              borderRadius: "var(--radius-sm)",
+              border: "1px solid var(--border)",
             }}
           >
-            <span style={{ fontFamily: 'var(--font-mono)', fontSize: '13px', color: 'var(--text)', wordBreak: 'break-all' }}>
+            <span
+              style={{
+                fontFamily: "var(--font-mono)",
+                fontSize: "13px",
+                color: "var(--text)",
+                wordBreak: "break-all",
+              }}
+            >
               {createdSecret}
             </span>
             <Button
@@ -139,7 +191,7 @@ export function KeysView() {
               icon={copied ? Check : Copy}
               onClick={() => copyToClipboard(createdSecret)}
             >
-              {copied ? 'Copied' : 'Copy'}
+              {copied ? "Copied" : "Copy"}
             </Button>
           </div>
         </div>
@@ -147,77 +199,136 @@ export function KeysView() {
 
       {/* Keys Table Card */}
       <Card>
-        <div style={{ overflowX: 'auto' }}>
-          <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '13px' }}>
+        <div style={{ overflowX: "auto" }}>
+          <table
+            style={{
+              width: "100%",
+              borderCollapse: "collapse",
+              fontSize: "13px",
+            }}
+          >
             <thead>
-              <tr style={{ borderBottom: '1px solid var(--border)', textAlign: 'left', color: 'var(--text-muted)' }}>
-                <th style={{ padding: '12px 14px' }}>Key Label & Identifier</th>
-                <th style={{ padding: '12px 14px' }}>Key Prefix</th>
-                <th style={{ padding: '12px 14px' }}>Spans Ingested</th>
-                <th style={{ padding: '12px 14px' }}>Status</th>
-                <th style={{ padding: '12px 14px' }}>Last Activity</th>
-                <th style={{ padding: '12px 14px', textAlign: 'right' }}>Actions</th>
+              <tr
+                style={{
+                  borderBottom: "1px solid var(--border)",
+                  textAlign: "left",
+                  color: "var(--text-muted)",
+                }}
+              >
+                <th style={{ padding: "12px 14px" }}>Key Label & Identifier</th>
+                <th style={{ padding: "12px 14px" }}>Key Prefix</th>
+                <th style={{ padding: "12px 14px" }}>Spans Ingested</th>
+                <th style={{ padding: "12px 14px" }}>Status</th>
+                <th style={{ padding: "12px 14px" }}>Last Activity</th>
+                <th style={{ padding: "12px 14px", textAlign: "right" }}>
+                  Actions
+                </th>
               </tr>
             </thead>
             <tbody>
               {keys.map((k) => (
-                <tr key={k.id} style={{ borderBottom: '1px solid var(--border-subtle)' }}>
-                  <td style={{ padding: '14px' }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                <tr
+                  key={k.id}
+                  style={{ borderBottom: "1px solid var(--border-subtle)" }}
+                >
+                  <td style={{ padding: "14px" }}>
+                    <div
+                      style={{
+                        display: "flex",
+                        alignItems: "center",
+                        gap: "10px",
+                      }}
+                    >
                       <div
                         style={{
-                          width: '32px',
-                          height: '32px',
-                          borderRadius: 'var(--radius)',
-                          backgroundColor: 'var(--surface-input)',
-                          color: k.isActive ? 'var(--accent)' : 'var(--text-dim)',
-                          display: 'flex',
-                          alignItems: 'center',
-                          justifyContent: 'center',
-                          border: '1px solid var(--border)',
+                          width: "32px",
+                          height: "32px",
+                          borderRadius: "var(--radius)",
+                          backgroundColor: "var(--surface-input)",
+                          color: k.isActive
+                            ? "var(--accent)"
+                            : "var(--text-dim)",
+                          display: "flex",
+                          alignItems: "center",
+                          justifyContent: "center",
+                          border: "1px solid var(--border)",
                         }}
                       >
                         <Key size={16} />
                       </div>
                       <div>
-                        <div style={{ fontWeight: 600, color: 'var(--text)' }}>{k.name}</div>
-                        <div style={{ fontSize: '11px', color: 'var(--text-muted)', fontFamily: 'var(--font-mono)' }}>
+                        <div style={{ fontWeight: 600, color: "var(--text)" }}>
+                          {k.name}
+                        </div>
+                        <div
+                          style={{
+                            fontSize: "11px",
+                            color: "var(--text-muted)",
+                            fontFamily: "var(--font-mono)",
+                          }}
+                        >
                           id: {k.id}
                         </div>
                       </div>
                     </div>
                   </td>
 
-                  <td style={{ padding: '14px', fontFamily: 'var(--font-mono)', color: 'var(--accent)' }}>
+                  <td
+                    style={{
+                      padding: "14px",
+                      fontFamily: "var(--font-mono)",
+                      color: "var(--accent)",
+                    }}
+                  >
                     {k.keyPrefix}...
                   </td>
 
-                  <td style={{ padding: '14px', fontFamily: 'var(--font-mono)', color: 'var(--text-secondary)' }}>
-                    {k.totalSpansIngested ? Number(k.totalSpansIngested).toLocaleString() : '142,000'}
+                  <td
+                    style={{
+                      padding: "14px",
+                      fontFamily: "var(--font-mono)",
+                      color: "var(--text-secondary)",
+                    }}
+                  >
+                    {k.totalSpansIngested
+                      ? Number(k.totalSpansIngested).toLocaleString()
+                      : "142,000"}
                   </td>
 
-                  <td style={{ padding: '14px' }}>
+                  <td style={{ padding: "14px" }}>
                     <StatusBadge
-                      status={k.isActive ? 'ok' : 'error'}
-                      label={k.isActive ? 'Active' : 'Disabled'}
+                      status={k.isActive ? "ok" : "error"}
+                      label={k.isActive ? "Active" : "Disabled"}
                       size="sm"
                     />
                   </td>
 
-                  <td style={{ padding: '14px', color: 'var(--text-dim)', fontSize: '12px' }}>
-                    {k.lastUsedAt || 'Recently'}
+                  <td
+                    style={{
+                      padding: "14px",
+                      color: "var(--text-dim)",
+                      fontSize: "12px",
+                    }}
+                  >
+                    {k.lastUsedAt || "Recently"}
                   </td>
 
-                  <td style={{ padding: '14px', textAlign: 'right' }}>
-                    <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '6px' }}>
+                  <td style={{ padding: "14px", textAlign: "right" }}>
+                    <div
+                      style={{
+                        display: "flex",
+                        justifyContent: "flex-end",
+                        gap: "6px",
+                      }}
+                    >
                       <Button
                         variant="ghost"
                         size="sm"
                         icon={Power}
                         onClick={() => handleToggleActive(k)}
-                        title={k.isActive ? 'Disable key' : 'Enable key'}
+                        title={k.isActive ? "Disable key" : "Enable key"}
                       >
-                        {k.isActive ? 'Disable' : 'Enable'}
+                        {k.isActive ? "Disable" : "Enable"}
                       </Button>
                       <Button
                         variant="danger"
@@ -243,9 +354,13 @@ export function KeysView() {
         onClose={() => setIsCreateModalOpen(false)}
         title="Generate New Ingestion API Key"
       >
-        <form onSubmit={handleCreateKey} style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
-          <p className="text-body" style={{ color: 'var(--text-secondary)' }}>
-            Provide a descriptive name to identify which cluster, pipeline, or collector will use this key.
+        <form
+          onSubmit={handleCreateKey}
+          style={{ display: "flex", flexDirection: "column", gap: "16px" }}
+        >
+          <p className="text-body" style={{ color: "var(--text-secondary)" }}>
+            Provide a descriptive name to identify which cluster, pipeline, or
+            collector will use this key.
           </p>
 
           <Input
@@ -257,8 +372,18 @@ export function KeysView() {
             autoFocus
           />
 
-          <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '10px', marginTop: '8px' }}>
-            <Button variant="secondary" onClick={() => setIsCreateModalOpen(false)}>
+          <div
+            style={{
+              display: "flex",
+              justifyContent: "flex-end",
+              gap: "10px",
+              marginTop: "8px",
+            }}
+          >
+            <Button
+              variant="secondary"
+              onClick={() => setIsCreateModalOpen(false)}
+            >
               Cancel
             </Button>
             <Button type="submit" variant="primary" isLoading={isSubmitting}>

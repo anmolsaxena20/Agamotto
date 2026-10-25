@@ -33,6 +33,7 @@ export async function createKey(req, res, next) {
         name: ingestKey.name,
         keyPrefix: ingestKey.keyPrefix,
         secretKey: rawSecret,
+        secret: rawSecret,
         isActive: ingestKey.isActive,
         expiresAt: ingestKey.expiresAt,
         createdAt: ingestKey.createdAt,
