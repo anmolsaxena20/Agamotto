@@ -205,3 +205,9 @@ ANALYTICS_INTERNAL_TOKEN="<shared-internal-token>"
    npm install
    npm start
    ```
+
+---
+
+## Technical Notes & System Safeguards
+
+* **Telemetry Amplification & In-Memory Buffer Queue**: For an in-depth root-cause analysis of the recursive telemetry loop that produced 1.58M spans, ClickHouse `TOO_MANY_PARTS` rate-limit dynamics, and the in-memory buffered batch queue design, see [feedback_loop_rootcause.md](file:///c:/Users/anmol/OneDrive/Desktop/projects/agamotto/readmes/feedback_loop_rootcause.md).

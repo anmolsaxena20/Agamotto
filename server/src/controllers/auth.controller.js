@@ -16,7 +16,7 @@ import {
 } from '../services/otp.store.js';
 import { provisionDefaultGroups } from '../services/rbac.service.js';
 
-const CLIENT_URL = process.env.CLIENT_URL || 'http://localhost:5173';
+const CLIENT_URL = process.env.CLIENT_URL || process.env.FRONTEND_URL || 'http://localhost:5173';
 
 function setAuthCookies(res, accessToken, refreshToken) {
   const isProduction = process.env.NODE_ENV === 'production';

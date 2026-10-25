@@ -4,8 +4,6 @@ function required(name) {
   return value;
 }
 
-// The control plane owns ingest-key hashes and tenant binding. This gateway
-// never derives an organization from resource attributes or payload contents.
 export function createKeyValidator() {
   const url = required('INGESTION_KEY_VALIDATION_URL');
   const token = required('INGESTION_KEY_VALIDATION_TOKEN');

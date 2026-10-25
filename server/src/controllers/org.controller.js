@@ -185,7 +185,7 @@ export async function listMembers(req, res, next) {
 export async function addMember(req, res, next) {
   try {
     const orgId = req.params.orgId;
-    const { email, groupId } = req.body ?? {};
+    const { email, groupId, role } = req.body ?? {};
 
     if (!email || typeof email !== 'string') {
       return res.status(400).json({ error: 'Valid user email is required' });
@@ -215,28 +215,26 @@ export async function addMember(req, res, next) {
       status: 'ACTIVE',
     });
 
-    let targetGroupId = groupId;
-    if (!targetGroupId) {
-      const viewerGroup = await db.orm.public.OrganizationGroup.where({
-        orgId,
-        code: 'VIEWER',
-      }).first();
-      if (viewerGroup) {
-        targetGroupId = viewerGroup.id;
-      }
+    let targetGroup = null;
+    if (groupId) {
+      targetGroup = (await db.orm.public.OrganizationGroup.where({ id: groupId, orgId }).first())
+        || (await db.orm.public.OrganizationGroup.where({ code: String(groupId).toUpperCase(), orgId }).first());
+    }
+    if (!targetGroup && role) {
+      const roleUpper = String(role).toUpperCase();
+      targetGroup = (await db.orm.public.OrganizationGroup.where({ code: roleUpper, orgId }).first())
+        || (await db.orm.public.OrganizationGroup.where({ name: role, orgId }).first());
+    }
+    if (!targetGroup) {
+      targetGroup = (await db.orm.public.OrganizationGroup.where({ orgId, code: 'VIEWER' }).first())
+        || (await db.orm.public.OrganizationGroup.where({ orgId, code: 'DEVELOPER' }).first());
     }
 
-    if (targetGroupId) {
-      const group = await db.orm.public.OrganizationGroup.where({
-        id: targetGroupId,
-        orgId,
-      }).first();
-      if (group) {
-        await db.orm.public.MemberGroupAssignment.create({
-          memberId: member.id,
-          groupId: group.id,
-        });
-      }
+    if (targetGroup) {
+      await db.orm.public.MemberGroupAssignment.create({
+        memberId: member.id,
+        groupId: targetGroup.id,
+      });
     }
 
     return res.status(201).json({
