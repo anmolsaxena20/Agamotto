@@ -16,11 +16,11 @@ import {
   CheckCircle2,
 } from 'lucide-react';
 
-export function AuthPage() {
+export function AuthPage({ onEnterDashboard, initialUser }) {
   const [mode, setMode] = useState('login'); // 'login' | 'signup'
   const [otpModalState, setOtpModalState] = useState(null); // { email, name, expiresAt, isDemo }
   const [isForgotPasswordOpen, setIsForgotPasswordOpen] = useState(false);
-  const [currentUser, setCurrentUser] = useState(null);
+  const [currentUser, setCurrentUser] = useState(initialUser || null);
   const [otpLoading, setOtpLoading] = useState(false);
   const [otpError, setOtpError] = useState(null);
 
@@ -153,7 +153,30 @@ export function AuthPage() {
         </div>
 
         <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-          <StatusBadge status="ok" label="Gateway Ready" size="sm" />
+          {onEnterDashboard && (
+            <button
+              onClick={() => onEnterDashboard?.()}
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: '6px',
+                padding: '6px 12px',
+                backgroundColor: 'var(--accent-subtle)',
+                border: '1px solid var(--accent)',
+                borderRadius: 'var(--radius-sm)',
+                color: 'var(--accent)',
+                fontSize: '12px',
+                fontWeight: 600,
+                cursor: 'pointer',
+                transition: 'all 0.15s',
+              }}
+            >
+              <Activity size={14} />
+              <span>Observability Dashboard</span>
+              <ArrowRight size={12} />
+            </button>
+          )}
+          <StatusBadge status="ok" label="Backend Live (:3000)" size="sm" />
           <div
             style={{
               fontSize: '11px',
@@ -163,7 +186,7 @@ export function AuthPage() {
               paddingLeft: '12px',
             }}
           >
-            Port :3000
+            Port :5173
           </div>
         </div>
       </header>
@@ -184,6 +207,7 @@ export function AuthPage() {
             user={currentUser.user}
             organization={currentUser.organization}
             onLogout={() => setCurrentUser(null)}
+            onEnterDashboard={() => onEnterDashboard?.(currentUser)}
           />
         ) : (
           <div

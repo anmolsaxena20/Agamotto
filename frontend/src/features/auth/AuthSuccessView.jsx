@@ -5,7 +5,7 @@ import { StatusBadge } from '../../components/StatusBadge.jsx';
 import { Card } from '../../components/Card.jsx';
 import { authApi } from '../../services/authApi.js';
 
-export function AuthSuccessView({ user, organization, onLogout }) {
+export function AuthSuccessView({ user, organization, onLogout, onEnterDashboard }) {
   const handleLogout = async () => {
     try {
       await authApi.logout();
@@ -104,11 +104,11 @@ export function AuthSuccessView({ user, organization, onLogout }) {
           <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '8px' }}>
             <Activity size={16} style={{ color: 'var(--accent)' }} />
             <h4 style={{ fontSize: '14px', fontWeight: 600, color: 'var(--text)' }}>
-              Next Step: Ingest First Telemetry Trace
+              Telemetry Control Plane Active
             </h4>
           </div>
           <p style={{ fontSize: '13px', color: 'var(--text-secondary)', marginBottom: '12px', lineHeight: 1.4 }}>
-            Eye of Agamotto receives OpenTelemetry OTLP traces directly. Copy your ingestion endpoint and test connection.
+            Eye of Agamotto receives OpenTelemetry OTLP traces directly. Explore your traces, spans, logs, and system metrics now.
           </p>
 
           <div
@@ -135,17 +135,17 @@ export function AuthSuccessView({ user, organization, onLogout }) {
               variant="primary"
               size="default"
               icon={ArrowRight}
-              onClick={() => alert('Ready to route to /setup or /overview once created!')}
+              onClick={onEnterDashboard}
             >
-              Open Setup & Ingest Keys
+              Open Observability Dashboard
             </Button>
             <Button
               variant="secondary"
               size="default"
               icon={Terminal}
-              onClick={() => alert('Starting live OpenTelemetry mock stream...')}
+              onClick={onEnterDashboard}
             >
-              Start Demo Stream
+              Launch Telemetry View
             </Button>
           </div>
         </Card>
