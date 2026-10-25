@@ -33,9 +33,14 @@ export function TelemetryOverviewView({ onSelectService, onSelectTrace, onNaviga
         analyticsService.getServices(currentOrg.id),
         analyticsService.getErrors(currentOrg.id, { limit: 3 }),
       ]);
-      setOverview(ovRes);
-      setServicesData(srvRes?.services || []);
-      setErrorsData(errRes?.data || []);
+      const rawOv = Array.isArray(ovRes?.data) ? ovRes.data[0] : (ovRes?.data || ovRes);
+      setOverview(rawOv || null);
+
+      const rawSrv = Array.isArray(srvRes?.data) ? srvRes.data : (srvRes?.services || []);
+      setServicesData(rawSrv);
+
+      const rawErr = Array.isArray(errRes?.data) ? errRes.data : (errRes?.errors || []);
+      setErrorsData(rawErr);
     } catch (err) {
       console.warn('Failed to load telemetry overview:', err);
     } finally {
@@ -46,6 +51,14 @@ export function TelemetryOverviewView({ onSelectService, onSelectTrace, onNaviga
   useEffect(() => {
     fetchData();
   }, [currentOrg?.id]);
+
+  const totalSpans = overview?.total_spans ?? overview?.totalSpans ?? 0;
+  const totalRequests = overview?.total_requests ?? overview?.totalRequests ?? 0;
+  const errorRateRaw = overview?.error_rate ?? overview?.errorRate ?? 0;
+  const errorRateFormatted = (Number(errorRateRaw) * (errorRateRaw <= 1 && errorRateRaw > 0 ? 100 : 1)).toFixed(2);
+  const p50 = overview?.p50_ms ?? overview?.p50 ?? 0;
+  const p95 = overview?.p95_ms ?? overview?.p95 ?? 0;
+  const p99 = overview?.p99_ms ?? overview?.p99 ?? 0;
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
@@ -89,10 +102,10 @@ export function TelemetryOverviewView({ onSelectService, onSelectTrace, onNaviga
           </div>
           <div>
             <div style={{ fontSize: '24px', fontWeight: 700, color: 'var(--text)', fontFamily: 'var(--font-mono)' }}>
-              {overview?.totalSpans != null ? Number(overview.totalSpans).toLocaleString() : '0'}
+              {Number(totalSpans).toLocaleString()}
             </div>
-            <div style={{ fontSize: '11px', color: overview?.totalSpans ? 'var(--ok)' : 'var(--text-dim)', marginTop: '2px' }}>
-              <span>{overview?.totalSpans ? 'Live ingested spans' : 'Awaiting telemetry ingestion'}</span>
+            <div style={{ fontSize: '11px', color: totalSpans > 0 ? 'var(--ok)' : 'var(--text-dim)', marginTop: '2px' }}>
+              <span>{totalSpans > 0 ? 'Live ingested spans' : 'Awaiting telemetry ingestion'}</span>
             </div>
           </div>
         </Card>
@@ -107,7 +120,7 @@ export function TelemetryOverviewView({ onSelectService, onSelectTrace, onNaviga
           </div>
           <div>
             <div style={{ fontSize: '24px', fontWeight: 700, color: 'var(--text)', fontFamily: 'var(--font-mono)' }}>
-              {overview?.totalRequests != null ? Number(overview.totalRequests).toLocaleString() : '0'}
+              {Number(totalRequests).toLocaleString()}
             </div>
             <div style={{ fontSize: '11px', color: 'var(--text-muted)', marginTop: '2px' }}>
               {servicesData.length > 0 ? `Across ${servicesData.length} registered service${servicesData.length === 1 ? '' : 's'}` : 'No active services detected'}
@@ -121,18 +134,18 @@ export function TelemetryOverviewView({ onSelectService, onSelectTrace, onNaviga
             <span className="text-small" style={{ textTransform: 'uppercase', letterSpacing: '0.05em' }}>
               Aggregate Error Rate
             </span>
-            <AlertTriangle size={16} style={{ color: (overview?.errorRate || 0) > 1 ? 'var(--warn)' : 'var(--ok)' }} />
+            <AlertTriangle size={16} style={{ color: Number(errorRateFormatted) > 1 ? 'var(--warn)' : 'var(--ok)' }} />
           </div>
           <div>
             <div
               style={{
                 fontSize: '24px',
                 fontWeight: 700,
-                color: (overview?.errorRate || 0) > 1 ? 'var(--warn)' : 'var(--ok)',
+                color: Number(errorRateFormatted) > 1 ? 'var(--warn)' : 'var(--ok)',
                 fontFamily: 'var(--font-mono)',
               }}
             >
-              {overview?.errorRate != null ? `${overview.errorRate}%` : '0.00%'}
+              {errorRateFormatted}%
             </div>
             <div style={{ fontSize: '11px', color: 'var(--text-muted)', marginTop: '2px' }}>
               Target SLA &lt; 1.0%
@@ -150,7 +163,7 @@ export function TelemetryOverviewView({ onSelectService, onSelectTrace, onNaviga
           </div>
           <div>
             <div style={{ fontSize: '24px', fontWeight: 700, color: 'var(--text)', fontFamily: 'var(--font-mono)' }}>
-              {overview?.p50 != null ? `${overview.p50} ms` : '0 ms'}
+              {p50} ms
             </div>
             <div style={{ fontSize: '11px', color: 'var(--ok)', marginTop: '2px' }}>
               Median baseline
@@ -168,7 +181,7 @@ export function TelemetryOverviewView({ onSelectService, onSelectTrace, onNaviga
           </div>
           <div>
             <div style={{ fontSize: '24px', fontWeight: 700, color: 'var(--text)', fontFamily: 'var(--font-mono)' }}>
-              {overview?.p95 != null ? `${overview.p95} ms` : '0 ms'}
+              {p95} ms
             </div>
             <div style={{ fontSize: '11px', color: 'var(--text-muted)', marginTop: '2px' }}>
               SLA benchmark
@@ -186,7 +199,7 @@ export function TelemetryOverviewView({ onSelectService, onSelectTrace, onNaviga
           </div>
           <div>
             <div style={{ fontSize: '24px', fontWeight: 700, color: 'var(--warn)', fontFamily: 'var(--font-mono)' }}>
-              {overview?.p99 != null ? `${overview.p99} ms` : '0 ms'}
+              {p99} ms
             </div>
             <div style={{ fontSize: '11px', color: 'var(--text-muted)', marginTop: '2px' }}>
               Worst-case peak
@@ -219,99 +232,107 @@ export function TelemetryOverviewView({ onSelectService, onSelectTrace, onNaviga
           </Card>
         ) : (
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(320px, 1fr))', gap: '16px' }}>
-            {servicesData.map((svc) => (
-              <Card
-                key={svc.name}
-                hoverable
-                onClick={() => onSelectService ? onSelectService(svc.name) : onNavigate?.('services')}
-                style={{
-                  display: 'flex',
-                  flexDirection: 'column',
-                  gap: '12px',
-                  cursor: 'pointer',
-                }}
-              >
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                    <div
-                      style={{
-                        width: '32px',
-                        height: '32px',
-                        borderRadius: 'var(--radius)',
-                        backgroundColor: 'var(--surface-subtle)',
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                        color: 'var(--accent)',
-                        border: '1px solid var(--border)',
-                      }}
-                    >
-                      <Server size={16} />
-                    </div>
-                    <div>
-                      <div style={{ fontWeight: 600, color: 'var(--text)', fontSize: '14px' }}>
-                        {svc.name}
-                      </div>
-                      <div style={{ fontSize: '11px', color: 'var(--text-muted)' }}>
-                        {svc.instances || 1} instance{(svc.instances || 1) > 1 ? 's' : ''} running
-                      </div>
-                    </div>
-                  </div>
+            {servicesData.map((svc, sIdx) => {
+              const svcName = svc.service_name || svc.name || `service-${sIdx}`;
+              const svcSpans = svc.spans ?? svc.total_spans ?? svc.requests ?? 0;
+              const svcErrRate = Number(svc.error_rate != null ? (svc.error_rate * 100).toFixed(2) : svc.errorRate || 0);
+              const svcP99 = svc.p99_ms ?? svc.p99 ?? 0;
+              const isNominal = svcErrRate <= 1;
 
-                  <StatusBadge
-                    status={svc.status === 'ok' ? 'ok' : 'warn'}
-                    label={svc.status === 'ok' ? 'Healthy' : 'Investigate'}
-                    size="sm"
-                  />
-                </div>
-
-                {/* Service Metrics Row */}
-                <div
+              return (
+                <Card
+                  key={svcName}
+                  hoverable
+                  onClick={() => onSelectService ? onSelectService(svcName) : onNavigate?.('services')}
                   style={{
-                    display: 'grid',
-                    gridTemplateColumns: '1fr 1fr 1fr',
-                    gap: '8px',
-                    padding: '10px',
-                    backgroundColor: 'var(--surface-input)',
-                    borderRadius: 'var(--radius-sm)',
-                    border: '1px solid var(--border-subtle)',
+                    display: 'flex',
+                    flexDirection: 'column',
+                    gap: '12px',
+                    cursor: 'pointer',
                   }}
                 >
-                  <div>
-                    <div style={{ fontSize: '10px', color: 'var(--text-muted)', textTransform: 'uppercase' }}>Requests</div>
-                    <div style={{ fontSize: '13px', fontWeight: 600, fontFamily: 'var(--font-mono)' }}>
-                      {svc.requests ? Number(svc.requests).toLocaleString() : '0'}
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                      <div
+                        style={{
+                          width: '32px',
+                          height: '32px',
+                          borderRadius: 'var(--radius)',
+                          backgroundColor: 'var(--surface-subtle)',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          color: 'var(--accent)',
+                          border: '1px solid var(--border)',
+                        }}
+                      >
+                        <Server size={16} />
+                      </div>
+                      <div>
+                        <div style={{ fontWeight: 600, color: 'var(--text)', fontSize: '14px' }}>
+                          {svcName}
+                        </div>
+                        <div style={{ fontSize: '11px', color: 'var(--text-muted)' }}>
+                          {svc.instances || 1} instance{(svc.instances || 1) > 1 ? 's' : ''} running
+                        </div>
+                      </div>
+                    </div>
+
+                    <StatusBadge
+                      status={isNominal ? 'ok' : 'warn'}
+                      label={isNominal ? 'Healthy' : 'Investigate'}
+                      size="sm"
+                    />
+                  </div>
+
+                  {/* Service Metrics Row */}
+                  <div
+                    style={{
+                      display: 'grid',
+                      gridTemplateColumns: '1fr 1fr 1fr',
+                      gap: '8px',
+                      padding: '10px',
+                      backgroundColor: 'var(--surface-input)',
+                      borderRadius: 'var(--radius-sm)',
+                      border: '1px solid var(--border-subtle)',
+                    }}
+                  >
+                    <div>
+                      <div style={{ fontSize: '10px', color: 'var(--text-muted)', textTransform: 'uppercase' }}>Volume</div>
+                      <div style={{ fontSize: '13px', fontWeight: 600, fontFamily: 'var(--font-mono)' }}>
+                        {Number(svcSpans).toLocaleString()}
+                      </div>
+                    </div>
+
+                    <div>
+                      <div style={{ fontSize: '10px', color: 'var(--text-muted)', textTransform: 'uppercase' }}>Error Rate</div>
+                      <div
+                        style={{
+                          fontSize: '13px',
+                          fontWeight: 600,
+                          fontFamily: 'var(--font-mono)',
+                          color: svcErrRate > 1 ? 'var(--warn)' : 'var(--ok)',
+                        }}
+                      >
+                        {svcErrRate}%
+                      </div>
+                    </div>
+
+                    <div>
+                      <div style={{ fontSize: '10px', color: 'var(--text-muted)', textTransform: 'uppercase' }}>p99 Latency</div>
+                      <div style={{ fontSize: '13px', fontWeight: 600, fontFamily: 'var(--font-mono)', color: 'var(--accent)' }}>
+                        {svcP99}ms
+                      </div>
                     </div>
                   </div>
 
-                  <div>
-                    <div style={{ fontSize: '10px', color: 'var(--text-muted)', textTransform: 'uppercase' }}>Error Rate</div>
-                    <div
-                      style={{
-                        fontSize: '13px',
-                        fontWeight: 600,
-                        fontFamily: 'var(--font-mono)',
-                        color: svc.errorRate > 1 ? 'var(--warn)' : 'var(--ok)',
-                      }}
-                    >
-                      {svc.errorRate || 0}%
-                    </div>
+                  <div style={{ fontSize: '11px', color: 'var(--accent)', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                    <span>Click to inspect telemetry traces & metrics</span>
+                    <ChevronRight size={12} />
                   </div>
-
-                  <div>
-                    <div style={{ fontSize: '10px', color: 'var(--text-muted)', textTransform: 'uppercase' }}>p99 Latency</div>
-                    <div style={{ fontSize: '13px', fontWeight: 600, fontFamily: 'var(--font-mono)', color: 'var(--accent)' }}>
-                      {svc.p99 || 0}ms
-                    </div>
-                  </div>
-                </div>
-
-                <div style={{ fontSize: '11px', color: 'var(--accent)', display: 'flex', alignItems: 'center', gap: '4px' }}>
-                  <span>Click to inspect telemetry traces & metrics</span>
-                  <ChevronRight size={12} />
-                </div>
-              </Card>
-            ))}
+                </Card>
+              );
+            })}
           </div>
         )}
       </div>
@@ -332,82 +353,89 @@ export function TelemetryOverviewView({ onSelectService, onSelectTrace, onNaviga
             </div>
           ) : (
             <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
-              {errorsData.map((err, idx) => (
-                <div
-                  key={err.id || idx}
-                  onClick={() => onNavigate?.('traces')}
-                  style={{
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'space-between',
-                    padding: '12px 14px',
-                    backgroundColor: 'var(--surface-input)',
-                    border: '1px solid var(--border)',
-                    borderRadius: 'var(--radius-sm)',
-                    cursor: 'pointer',
-                    transition: 'border-color 0.15s, background-color 0.15s',
-                  }}
-                  onMouseEnter={(e) => {
-                    e.currentTarget.style.borderColor = 'var(--accent)';
-                    e.currentTarget.style.backgroundColor = 'var(--surface-hover)';
-                  }}
-                  onMouseLeave={(e) => {
-                    e.currentTarget.style.borderColor = 'var(--border)';
-                    e.currentTarget.style.backgroundColor = 'var(--surface-input)';
-                  }}
-                >
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-                    <div
-                      style={{
-                        width: '28px',
-                        height: '28px',
-                        borderRadius: '50%',
-                        backgroundColor: 'var(--error-bg)',
-                        border: '1px solid var(--error-border)',
-                        color: 'var(--error)',
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                        flexShrink: 0,
-                      }}
-                    >
-                      <AlertTriangle size={14} />
-                    </div>
-                    <div>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                        <span style={{ fontWeight: 600, color: 'var(--text)', fontSize: '13px' }}>
-                          {err.errorType || 'Exception'}
-                        </span>
-                        <span
-                          style={{
-                            fontSize: '11px',
-                            padding: '1px 6px',
-                            borderRadius: 'var(--radius-sm)',
-                            backgroundColor: 'var(--surface)',
-                            border: '1px solid var(--border)',
-                            fontFamily: 'var(--font-mono)',
-                            color: 'var(--text-secondary)',
-                          }}
-                        >
-                          {err.service}
-                        </span>
-                      </div>
-                      <div style={{ fontSize: '12px', color: 'var(--text-muted)', marginTop: '2px' }}>
-                        {err.message}
-                      </div>
-                    </div>
-                  </div>
+              {errorsData.map((err, idx) => {
+                const service = err.service_name || err.service || 'unknown';
+                const endpoint = err.endpoint || err.name || err.message || 'Error occurred';
+                const errorCount = err.errors ?? err.count ?? 1;
+                const lastSeen = err.last_seen || err.lastSeen ? new Date(err.last_seen || err.lastSeen).toLocaleTimeString() : 'Recent';
 
-                  <div style={{ textAlign: 'right' }}>
-                    <div style={{ fontSize: '12px', fontWeight: 600, color: 'var(--error)', fontFamily: 'var(--font-mono)' }}>
-                      {err.count} occurrences
+                return (
+                  <div
+                    key={idx}
+                    onClick={() => onNavigate?.('traces')}
+                    style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'space-between',
+                      padding: '12px 14px',
+                      backgroundColor: 'var(--surface-input)',
+                      border: '1px solid var(--border)',
+                      borderRadius: 'var(--radius-sm)',
+                      cursor: 'pointer',
+                      transition: 'border-color 0.15s, background-color 0.15s',
+                    }}
+                    onMouseEnter={(e) => {
+                      e.currentTarget.style.borderColor = 'var(--accent)';
+                      e.currentTarget.style.backgroundColor = 'var(--surface-hover)';
+                    }}
+                    onMouseLeave={(e) => {
+                      e.currentTarget.style.borderColor = 'var(--border)';
+                      e.currentTarget.style.backgroundColor = 'var(--surface-input)';
+                    }}
+                  >
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                      <div
+                        style={{
+                          width: '28px',
+                          height: '28px',
+                          borderRadius: '50%',
+                          backgroundColor: 'var(--error-bg)',
+                          border: '1px solid var(--error-border)',
+                          color: 'var(--error)',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          flexShrink: 0,
+                        }}
+                      >
+                        <AlertTriangle size={14} />
+                      </div>
+                      <div>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                          <span style={{ fontWeight: 600, color: 'var(--text)', fontSize: '13px' }}>
+                            {endpoint}
+                          </span>
+                          <span
+                            style={{
+                              fontSize: '11px',
+                              padding: '1px 6px',
+                              borderRadius: 'var(--radius-sm)',
+                              backgroundColor: 'var(--surface)',
+                              border: '1px solid var(--border)',
+                              fontFamily: 'var(--font-mono)',
+                              color: 'var(--text-secondary)',
+                            }}
+                          >
+                            {service}
+                          </span>
+                        </div>
+                        <div style={{ fontSize: '12px', color: 'var(--text-muted)', marginTop: '2px' }}>
+                          p99 duration: {err.p99_ms != null ? `${err.p99_ms}ms` : 'N/A'}
+                        </div>
+                      </div>
                     </div>
-                    <div style={{ fontSize: '11px', color: 'var(--text-dim)' }}>
-                      {err.lastSeen || 'Recent'}
+
+                    <div style={{ textAlign: 'right' }}>
+                      <div style={{ fontSize: '12px', fontWeight: 600, color: 'var(--error)', fontFamily: 'var(--font-mono)' }}>
+                        {errorCount} occurrences
+                      </div>
+                      <div style={{ fontSize: '11px', color: 'var(--text-dim)' }}>
+                        {lastSeen}
+                      </div>
                     </div>
                   </div>
-                </div>
-              ))}
+                );
+              })}
             </div>
           )}
         </Card>
@@ -415,4 +443,3 @@ export function TelemetryOverviewView({ onSelectService, onSelectTrace, onNaviga
     </div>
   );
 }
-

@@ -19,8 +19,11 @@ export function LatencyView() {
         analyticsService.getLatency(currentOrg.id),
         analyticsService.getLatencyTimeseries(currentOrg.id),
       ]);
-      setDistributions(distRes?.distributions || []);
-      setTimeseries(tsRes?.data || []);
+      const rawDist = Array.isArray(distRes?.data) ? distRes.data : (distRes?.distributions || []);
+      setDistributions(rawDist);
+
+      const rawTs = Array.isArray(tsRes?.data) ? tsRes.data : (tsRes?.timeseries || []);
+      setTimeseries(rawTs);
     } catch (err) {
       console.warn('Failed to fetch latency data:', err);
     } finally {
@@ -33,7 +36,7 @@ export function LatencyView() {
   }, [currentOrg?.id]);
 
   // Compute max p99 in timeseries for visual scaling
-  const maxLatency = Math.max(...timeseries.map((t) => t.p99 || 100), 120);
+  const maxLatency = Math.max(...timeseries.map((t) => (t.p99_ms ?? t.p99 ?? 100)), 120);
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
@@ -75,70 +78,81 @@ export function LatencyView() {
         </div>
 
         {/* Visual Bar Chart */}
-        <div
-          style={{
-            height: '200px',
-            display: 'flex',
-            alignItems: 'flex-end',
-            gap: '8px',
-            padding: '10px 0',
-            borderBottom: '1px solid var(--border)',
-          }}
-        >
-          {timeseries.slice(-20).map((pt, i) => {
-            const h50 = (pt.p50 / maxLatency) * 160;
-            const h95 = (pt.p95 / maxLatency) * 160;
-            const h99 = (pt.p99 / maxLatency) * 160;
+        {timeseries.length === 0 ? (
+          <div style={{ height: '140px', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--text-muted)', fontSize: '13px' }}>
+            {isLoading ? 'Computing latency distributions...' : 'No timeseries latency data recorded yet.'}
+          </div>
+        ) : (
+          <div
+            style={{
+              height: '200px',
+              display: 'flex',
+              alignItems: 'flex-end',
+              gap: '8px',
+              padding: '10px 0',
+              borderBottom: '1px solid var(--border)',
+            }}
+          >
+            {timeseries.slice(-20).map((pt, i) => {
+              const p50Val = pt.p50_ms ?? pt.p50 ?? 0;
+              const p95Val = pt.p95_ms ?? pt.p95 ?? 0;
+              const p99Val = pt.p99_ms ?? pt.p99 ?? 0;
+              const timeLabel = pt.timestamp ? new Date(pt.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : (pt.time || '');
 
-            return (
-              <div
-                key={i}
-                style={{
-                  flex: 1,
-                  display: 'flex',
-                  flexDirection: 'column',
-                  alignItems: 'center',
-                  height: '100%',
-                  justifyContent: 'flex-end',
-                  gap: '4px',
-                }}
-              >
-                <div style={{ display: 'flex', alignItems: 'flex-end', gap: '2px', width: '100%', justifyContent: 'center' }}>
-                  <div
-                    title={`p50: ${pt.p50}ms`}
-                    style={{
-                      width: '6px',
-                      height: `${Math.max(4, h50)}px`,
-                      backgroundColor: 'var(--ok)',
-                      borderRadius: '2px 2px 0 0',
-                    }}
-                  />
-                  <div
-                    title={`p95: ${pt.p95}ms`}
-                    style={{
-                      width: '6px',
-                      height: `${Math.max(6, h95)}px`,
-                      backgroundColor: 'var(--accent)',
-                      borderRadius: '2px 2px 0 0',
-                    }}
-                  />
-                  <div
-                    title={`p99: ${pt.p99}ms`}
-                    style={{
-                      width: '6px',
-                      height: `${Math.max(8, h99)}px`,
-                      backgroundColor: 'var(--warn)',
-                      borderRadius: '2px 2px 0 0',
-                    }}
-                  />
+              const h50 = (p50Val / maxLatency) * 160;
+              const h95 = (p95Val / maxLatency) * 160;
+              const h99 = (p99Val / maxLatency) * 160;
+
+              return (
+                <div
+                  key={i}
+                  style={{
+                    flex: 1,
+                    display: 'flex',
+                    flexDirection: 'column',
+                    alignItems: 'center',
+                    height: '100%',
+                    justifyContent: 'flex-end',
+                    gap: '4px',
+                  }}
+                >
+                  <div style={{ display: 'flex', alignItems: 'flex-end', gap: '2px', width: '100%', justifyContent: 'center' }}>
+                    <div
+                      title={`p50: ${p50Val}ms`}
+                      style={{
+                        width: '6px',
+                        height: `${Math.max(4, h50)}px`,
+                        backgroundColor: 'var(--ok)',
+                        borderRadius: '2px 2px 0 0',
+                      }}
+                    />
+                    <div
+                      title={`p95: ${p95Val}ms`}
+                      style={{
+                        width: '6px',
+                        height: `${Math.max(6, h95)}px`,
+                        backgroundColor: 'var(--accent)',
+                        borderRadius: '2px 2px 0 0',
+                      }}
+                    />
+                    <div
+                      title={`p99: ${p99Val}ms`}
+                      style={{
+                        width: '6px',
+                        height: `${Math.max(8, h99)}px`,
+                        backgroundColor: 'var(--warn)',
+                        borderRadius: '2px 2px 0 0',
+                      }}
+                    />
+                  </div>
+                  <span style={{ fontSize: '9px', color: 'var(--text-dim)', transform: 'rotate(-45deg)', marginTop: '8px' }}>
+                    {timeLabel}
+                  </span>
                 </div>
-                <span style={{ fontSize: '9px', color: 'var(--text-dim)', transform: 'rotate(-45deg)', marginTop: '8px' }}>
-                  {pt.time}
-                </span>
-              </div>
-            );
-          })}
-        </div>
+              );
+            })}
+          </div>
+        )}
       </Card>
 
       {/* Per-Microservice Percentile Table */}
@@ -159,28 +173,45 @@ export function LatencyView() {
               </tr>
             </thead>
             <tbody>
-              {distributions.map((dist, idx) => (
-                <tr key={idx} style={{ borderBottom: '1px solid var(--border-subtle)' }}>
-                  <td style={{ padding: '12px 14px', fontWeight: 600, color: 'var(--text)' }}>
-                    {dist.service}
-                  </td>
-                  <td style={{ padding: '12px 14px', fontFamily: 'var(--font-mono)', color: 'var(--ok)' }}>
-                    {dist.p50} ms
-                  </td>
-                  <td style={{ padding: '12px 14px', fontFamily: 'var(--font-mono)', color: 'var(--text-secondary)' }}>
-                    {dist.p90} ms
-                  </td>
-                  <td style={{ padding: '12px 14px', fontFamily: 'var(--font-mono)', color: 'var(--accent)', fontWeight: 600 }}>
-                    {dist.p95} ms
-                  </td>
-                  <td style={{ padding: '12px 14px', fontFamily: 'var(--font-mono)', color: 'var(--warn)', fontWeight: 600 }}>
-                    {dist.p99} ms
-                  </td>
-                  <td style={{ padding: '12px 14px', fontFamily: 'var(--font-mono)', color: 'var(--error)' }}>
-                    {dist.p999} ms
+              {distributions.length === 0 ? (
+                <tr>
+                  <td colSpan={6} style={{ padding: '24px', textAlign: 'center', color: 'var(--text-muted)' }}>
+                    {isLoading ? 'Loading latency breakdown...' : 'No microservice latency records available.'}
                   </td>
                 </tr>
-              ))}
+              ) : (
+                distributions.map((dist, idx) => {
+                  const svcName = dist.service_name || dist.service || 'unknown';
+                  const p50 = dist.p50_ms ?? dist.p50 ?? 0;
+                  const p90 = dist.p90_ms ?? dist.p90 ?? 0;
+                  const p95 = dist.p95_ms ?? dist.p95 ?? 0;
+                  const p99 = dist.p99_ms ?? dist.p99 ?? 0;
+                  const p999 = dist.p999_ms ?? dist.p999 ?? 0;
+
+                  return (
+                    <tr key={idx} style={{ borderBottom: '1px solid var(--border-subtle)' }}>
+                      <td style={{ padding: '12px 14px', fontWeight: 600, color: 'var(--text)' }}>
+                        {svcName}
+                      </td>
+                      <td style={{ padding: '12px 14px', fontFamily: 'var(--font-mono)', color: 'var(--ok)' }}>
+                        {p50} ms
+                      </td>
+                      <td style={{ padding: '12px 14px', fontFamily: 'var(--font-mono)', color: 'var(--text-secondary)' }}>
+                        {p90} ms
+                      </td>
+                      <td style={{ padding: '12px 14px', fontFamily: 'var(--font-mono)', color: 'var(--accent)', fontWeight: 600 }}>
+                        {p95} ms
+                      </td>
+                      <td style={{ padding: '12px 14px', fontFamily: 'var(--font-mono)', color: 'var(--warn)', fontWeight: 600 }}>
+                        {p99} ms
+                      </td>
+                      <td style={{ padding: '12px 14px', fontFamily: 'var(--font-mono)', color: 'var(--error)' }}>
+                        {p999} ms
+                      </td>
+                    </tr>
+                  );
+                })
+              )}
             </tbody>
           </table>
         </div>

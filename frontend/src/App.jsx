@@ -13,6 +13,7 @@ import { NotFoundPage } from './features/misc/NotFoundPage.jsx';
 // Layout & Components
 import { AppHeader } from './components/AppHeader.jsx';
 import { Sidebar } from './components/Sidebar.jsx';
+import { ErrorBoundary } from './components/ErrorBoundary.jsx';
 
 // Telemetry Views
 import { TelemetryOverviewView } from './features/telemetry/TelemetryOverviewView.jsx';
@@ -139,48 +140,50 @@ function DashboardShell() {
             height: 'calc(100vh - 60px)',
           }}
         >
-          {tab === 'overview' && (
-            <TelemetryOverviewView
-              onSelectService={navigateToService}
-              onSelectTrace={navigateToTrace}
-              onNavigate={(targetTab) => navigate(`/dashboard/${targetTab}`)}
-            />
-          )}
+          <ErrorBoundary key={tab}>
+            {tab === 'overview' && (
+              <TelemetryOverviewView
+                onSelectService={navigateToService}
+                onSelectTrace={navigateToTrace}
+                onNavigate={(targetTab) => navigate(`/dashboard/${targetTab}`)}
+              />
+            )}
 
-          {tab === 'services' && (
-            <ServicesView
-              initialService={scopedService}
-              onSelectTrace={navigateToTrace}
-            />
-          )}
+            {tab === 'services' && (
+              <ServicesView
+                initialService={scopedService}
+                onSelectTrace={navigateToTrace}
+              />
+            )}
 
-          {tab === 'latency' && <LatencyView />}
+            {tab === 'latency' && <LatencyView />}
 
-          {tab === 'throughput' && <ThroughputView />}
+            {tab === 'throughput' && <ThroughputView />}
 
-          {tab === 'endpoints' && (
-            <EndpointsView onSelectEndpoint={() => navigate('/dashboard/traces')} />
-          )}
+            {tab === 'endpoints' && (
+              <EndpointsView onSelectEndpoint={() => navigate('/dashboard/traces')} />
+            )}
 
-          {tab === 'graph' && (
-            <DependencyGraphView onSelectService={navigateToService} />
-          )}
+            {tab === 'graph' && (
+              <DependencyGraphView onSelectService={navigateToService} />
+            )}
 
-          {tab === 'traces' && (
-            <TracesView initialTraceId={scopedTraceId} />
-          )}
+            {tab === 'traces' && (
+              <TracesView initialTraceId={scopedTraceId} />
+            )}
 
-          {tab === 'logs' && (
-            <LogsView onSelectTrace={navigateToTrace} />
-          )}
+            {tab === 'logs' && (
+              <LogsView onSelectTrace={navigateToTrace} />
+            )}
 
-          {tab === 'resources' && <ResourcesView />}
+            {tab === 'resources' && <ResourcesView />}
 
-          {tab === 'organizations' && <OrganizationsView />}
+            {tab === 'organizations' && <OrganizationsView />}
 
-          {tab === 'members' && <MembersView />}
+            {tab === 'members' && <MembersView />}
 
-          {tab === 'keys' && <KeysView />}
+            {tab === 'keys' && <KeysView />}
+          </ErrorBoundary>
         </main>
       </div>
     </div>

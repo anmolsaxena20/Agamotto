@@ -20,7 +20,7 @@ export function Sidebar({ currentTab, onSelectTab }) {
     {
       title: 'TELEMETRY & OBSERVABILITY',
       items: [
-        { id: 'overview', label: 'Global Overview', icon: Activity, badge: 'Live' },
+        { id: 'overview', label: 'Global Overview', icon: Activity },
         { id: 'services', label: 'Microservices', icon: Server },
         { id: 'latency', label: 'Latency Percentiles', icon: Clock },
         { id: 'throughput', label: 'Throughput & RPS', icon: Zap },

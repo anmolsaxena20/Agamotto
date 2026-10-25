@@ -19,7 +19,7 @@ export function LogsView({ onSelectTrace }) {
     try {
       const res = await analyticsService.getLogs(currentOrg.id, {
         severity: severityFilter === 'ALL' ? undefined : severityFilter,
-        query: search || undefined,
+        search: search || undefined,
       });
       setLogs(res?.data || []);
     } catch (err) {
@@ -34,11 +34,16 @@ export function LogsView({ onSelectTrace }) {
   }, [currentOrg?.id, severityFilter]);
 
   const filtered = logs.filter((log) => {
-    const matchSev = severityFilter === 'ALL' || log.severity === severityFilter;
+    const sev = log.severity_text || log.severity || 'INFO';
+    const msg = log.body || log.message || '';
+    const svc = log.service_name || log.service || '';
+    const trId = log.trace_id || log.traceId || '';
+
+    const matchSev = severityFilter === 'ALL' || sev.toUpperCase() === severityFilter;
     const matchQuery = !search ||
-      log.message.toLowerCase().includes(search.toLowerCase()) ||
-      log.service.toLowerCase().includes(search.toLowerCase()) ||
-      (log.traceId && log.traceId.toLowerCase().includes(search.toLowerCase()));
+      msg.toLowerCase().includes(search.toLowerCase()) ||
+      svc.toLowerCase().includes(search.toLowerCase()) ||
+      trId.toLowerCase().includes(search.toLowerCase());
     return matchSev && matchQuery;
   });
 
@@ -98,15 +103,14 @@ export function LogsView({ onSelectTrace }) {
                 key={sev}
                 onClick={() => setSeverityFilter(sev)}
                 style={{
-                  padding: '6px 14px',
+                  padding: '6px 12px',
                   borderRadius: 'var(--radius)',
                   backgroundColor: isSelected ? 'var(--accent-subtle)' : 'var(--surface)',
                   border: `1px solid ${isSelected ? 'var(--accent)' : 'var(--border)'}`,
-                  color: isSelected ? 'var(--accent)' : 'var(--text-muted)',
+                  color: isSelected ? 'var(--accent)' : 'var(--text-secondary)',
                   fontSize: '12px',
-                  fontWeight: 600,
+                  fontWeight: isSelected ? 600 : 500,
                   cursor: 'pointer',
-                  transition: 'all 0.15s',
                 }}
               >
                 {sev}
@@ -116,94 +120,51 @@ export function LogsView({ onSelectTrace }) {
         </div>
       </div>
 
-      {/* Terminal Log Console */}
-      <Card style={{ padding: 0, overflow: 'hidden' }}>
-        <div
-          style={{
-            padding: '12px 16px',
-            backgroundColor: 'var(--surface-subtle)',
-            borderBottom: '1px solid var(--border)',
-            display: 'flex',
-            alignItems: 'center',
-            gap: '8px',
-            fontSize: '12px',
-            fontWeight: 600,
-            color: 'var(--text-muted)',
-          }}
-        >
-          <Terminal size={15} style={{ color: 'var(--accent)' }} />
-          <span>ClickHouse Partition: <code>agamotto_telemetry.telemetry_logs</code></span>
-        </div>
-
-        <div
-          style={{
-            backgroundColor: 'var(--surface-input)',
-            padding: '16px',
-            fontFamily: 'var(--font-mono)',
-            fontSize: '12px',
-            display: 'flex',
-            flexDirection: 'column',
-            gap: '10px',
-            maxHeight: '520px',
-            overflowY: 'auto',
-          }}
-        >
+      {/* Log Output Console */}
+      <Card>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', fontFamily: 'var(--font-mono)', fontSize: '12px' }}>
           {filtered.length === 0 ? (
-            <div style={{ color: 'var(--text-dim)', textAlign: 'center', padding: '32px' }}>
-              No log records match the selected filter.
+            <div style={{ padding: '36px', textAlign: 'center', color: 'var(--text-muted)' }}>
+              {isLoading ? 'Streaming log records...' : 'No telemetry log records found matching the active criteria.'}
             </div>
           ) : (
-            filtered.map((log) => {
-              const sevColor = log.severity === 'ERROR' ? 'var(--error)' : log.severity === 'WARN' ? 'var(--warn)' : 'var(--ok)';
+            filtered.map((log, idx) => {
+              const time = log.time || log.timestamp || 'N/A';
+              const sev = (log.severity_text || log.severity || 'INFO').toUpperCase();
+              const msg = log.body || log.message || '';
+              const svc = log.service_name || log.service || 'app';
+              const trId = log.trace_id || log.traceId;
+
+              const sevColor = sev === 'ERROR' ? 'var(--error)' : sev === 'WARN' ? 'var(--warn)' : 'var(--ok)';
+
               return (
                 <div
-                  key={log.id}
+                  key={idx}
                   style={{
                     display: 'flex',
-                    alignItems: 'flex-start',
+                    alignItems: 'baseline',
                     gap: '12px',
                     padding: '8px 10px',
                     borderRadius: 'var(--radius-sm)',
+                    backgroundColor: idx % 2 === 0 ? 'var(--surface-input)' : 'transparent',
                     borderLeft: `3px solid ${sevColor}`,
-                    backgroundColor: 'rgba(21, 26, 35, 0.6)',
                   }}
                 >
                   <span style={{ color: 'var(--text-dim)', flexShrink: 0, fontSize: '11px' }}>
-                    {new Date(log.timestamp).toLocaleTimeString()}
+                    {typeof time === 'string' && time.includes('T') ? new Date(time).toLocaleTimeString() : time}
                   </span>
-
-                  <span
-                    style={{
-                      color: sevColor,
-                      fontWeight: 700,
-                      flexShrink: 0,
-                      width: '54px',
-                    }}
-                  >
-                    [{log.severity}]
+                  <span style={{ color: sevColor, fontWeight: 700, width: '48px', flexShrink: 0 }}>
+                    {sev}
                   </span>
-
-                  <span
-                    style={{
-                      color: 'var(--text-secondary)',
-                      backgroundColor: 'var(--surface)',
-                      border: '1px solid var(--border)',
-                      padding: '1px 6px',
-                      borderRadius: 'var(--radius-sm)',
-                      flexShrink: 0,
-                      fontSize: '11px',
-                    }}
-                  >
-                    {log.service}
+                  <span style={{ color: 'var(--accent)', flexShrink: 0, fontSize: '11px' }}>
+                    [{svc}]
                   </span>
-
-                  <span style={{ color: 'var(--text)', flex: 1, wordBreak: 'break-word', lineHeight: '1.5' }}>
-                    {log.message}
+                  <span style={{ color: 'var(--text)', flex: 1, wordBreak: 'break-word' }}>
+                    {msg}
                   </span>
-
-                  {log.traceId && (
+                  {trId && (
                     <button
-                      onClick={() => onSelectTrace?.(log.traceId)}
+                      onClick={() => onSelectTrace?.(trId)}
                       style={{
                         background: 'none',
                         border: 'none',
@@ -213,11 +174,11 @@ export function LogsView({ onSelectTrace }) {
                         gap: '4px',
                         cursor: 'pointer',
                         fontSize: '11px',
+                        fontFamily: 'var(--font-mono)',
                         flexShrink: 0,
                       }}
-                      title="Inspect this trace waterfall"
                     >
-                      <span>{log.traceId.slice(0, 10)}...</span>
+                      <span>trace:{trId.substring(0, 8)}...</span>
                       <ExternalLink size={12} />
                     </button>
                   )}

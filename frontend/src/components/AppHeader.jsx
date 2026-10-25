@@ -244,15 +244,15 @@ export function AppHeader({ onNavigate }) {
               alignItems: 'center',
               gap: '6px',
               padding: '4px 10px',
-              borderRadius: 'var(--radius-full)',
-              backgroundColor: 'var(--ok-bg)',
-              border: '1px solid var(--ok-border)',
-              fontSize: '12px',
-              color: 'var(--ok)',
-              fontWeight: 600,
+              borderRadius: 'var(--radius)',
+              backgroundColor: 'var(--surface-input)',
+              border: '1px solid var(--border)',
+              fontSize: '11px',
+              color: 'var(--text-secondary)',
+              fontWeight: 500,
             }}
           >
-            <Radio size={13} className="animate-pulse" />
+            <span style={{ width: '6px', height: '6px', borderRadius: '50%', backgroundColor: '#52525B' }} />
             <span>Ingestion Online</span>
           </div>
 
