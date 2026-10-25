@@ -12,7 +12,6 @@ import {
   Building2,
   Users,
   Key,
-  Mail,
   ChevronRight,
 } from 'lucide-react';
 
@@ -21,7 +20,7 @@ export function Sidebar({ currentTab, onSelectTab }) {
     {
       title: 'TELEMETRY & OBSERVABILITY',
       items: [
-        { id: 'overview', label: 'Global Overview', icon: Activity, badge: 'Live' },
+        { id: 'overview', label: 'Global Overview', icon: Activity },
         { id: 'services', label: 'Microservices', icon: Server },
         { id: 'latency', label: 'Latency Percentiles', icon: Clock },
         { id: 'throughput', label: 'Throughput & RPS', icon: Zap },
@@ -38,12 +37,6 @@ export function Sidebar({ currentTab, onSelectTab }) {
         { id: 'organizations', label: 'Workspaces', icon: Building2 },
         { id: 'members', label: 'Members & Roles', icon: Users },
         { id: 'keys', label: 'API Ingest Keys', icon: Key },
-      ],
-    },
-    {
-      title: 'NOTIFICATIONS',
-      items: [
-        { id: 'email-preview', label: 'Email Template', icon: Mail },
       ],
     },
   ];

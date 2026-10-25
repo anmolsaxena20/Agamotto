@@ -11,7 +11,14 @@ import { extractGrpcContext, shutdownTelemetry, startTelemetry, logger } from '.
 
 await startTelemetry({ serviceName: 'email-service' });
 
+const tracer = trace.getTracer('email-service.grpc');
+const meter = metrics.getMeter('email-service.grpc');
 const log = logger('email-service');
+
+const rpcServerCounter = meter.createCounter('rpc.server.request.count');
+const rpcServerDuration = meter.createHistogram('rpc.server.duration', { unit: 'ms' });
+const emailSentCounter = meter.createCounter('email.sent.count');
+const emailFailureCounter = meter.createCounter('email.failure.count');
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -32,12 +39,6 @@ const resendApiKey = process.env.RESEND_API_KEY;
 const resend = resendApiKey ? new Resend(resendApiKey) : null;
 const fromEmail = process.env.EMAIL_FROM || 'Agamotto <onboarding@resend.dev>';
 const port = process.env.PORT || '5000';
-
-const meter = metrics.getMeter('email-service.grpc');
-const rpcServerCounter = meter.createCounter('rpc.server.request.count');
-const rpcServerDuration = meter.createHistogram('rpc.server.duration', { unit: 'ms' });
-const emailSentCounter = meter.createCounter('email.sent.count');
-const emailFailureCounter = meter.createCounter('email.failure.count');
 
 async function sendOtp(call, callback) {
   const { email, type, name } = call.request;
@@ -125,7 +126,7 @@ function startServer() {
 
 function withGrpcSpan(call, name, callback, handler) {
   const parent = extractGrpcContext(call.metadata);
-  const span = trace.getTracer('email-service.grpc').startSpan(name, { kind: SpanKind.SERVER }, parent);
+  const span = tracer.startSpan(name, { kind: SpanKind.SERVER }, parent);
   const started = performance.now();
   const wrappedCallback = (err, resp) => {
     const elapsed = performance.now() - started;

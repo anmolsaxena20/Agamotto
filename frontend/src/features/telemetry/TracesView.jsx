@@ -97,50 +97,65 @@ export function TracesView({ initialTraceId }) {
               </tr>
             </thead>
             <tbody>
-              {traces.map((tr) => {
-                const isError = (tr.statusCode || 200) >= 400 || tr.errorCount > 0;
-                return (
-                  <tr
-                    key={tr.traceId}
-                    onClick={() => openTrace(tr.traceId)}
-                    style={{
-                      borderBottom: '1px solid var(--border-subtle)',
-                      cursor: 'pointer',
-                      transition: 'background-color 0.15s',
-                    }}
-                    onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = 'var(--surface-hover)')}
-                    onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = 'transparent')}
-                  >
-                    <td style={{ padding: '14px', fontFamily: 'var(--font-mono)', color: 'var(--accent)', fontWeight: 600 }}>
-                      {tr.traceId}
-                    </td>
-                    <td style={{ padding: '14px', fontWeight: 500, color: 'var(--text)' }}>
-                      {tr.rootSpan}
-                    </td>
-                    <td style={{ padding: '14px', color: 'var(--text-secondary)' }}>
-                      <span style={{ padding: '2px 8px', borderRadius: 'var(--radius-sm)', backgroundColor: 'var(--surface-input)', border: '1px solid var(--border)', fontSize: '11px', fontFamily: 'var(--font-mono)' }}>
-                        {tr.service}
-                      </span>
-                    </td>
-                    <td style={{ padding: '14px' }}>
-                      <StatusBadge
-                        status={isError ? 'error' : 'ok'}
-                        label={isError ? `HTTP ${tr.statusCode}` : `HTTP ${tr.statusCode || 200}`}
-                        size="sm"
-                      />
-                    </td>
-                    <td style={{ padding: '14px', fontFamily: 'var(--font-mono)', color: 'var(--text-muted)' }}>
-                      {tr.spanCount}
-                    </td>
-                    <td style={{ padding: '14px', fontFamily: 'var(--font-mono)', fontWeight: 600, color: tr.durationMs > 100 ? 'var(--warn)' : 'var(--text)' }}>
-                      {tr.durationMs}ms
-                    </td>
-                    <td style={{ padding: '14px', textAlign: 'right', color: 'var(--text-dim)', fontSize: '12px' }}>
-                      {new Date(tr.timestamp).toLocaleTimeString()}
-                    </td>
-                  </tr>
-                );
-              })}
+              {traces.length === 0 ? (
+                <tr>
+                  <td colSpan={7} style={{ padding: '36px', textAlign: 'center', color: 'var(--text-muted)' }}>
+                    {isLoading ? 'Searching traces...' : 'No distributed traces found for this workspace.'}
+                  </td>
+                </tr>
+              ) : (
+                traces.map((tr, idx) => {
+                  const traceId = tr.trace_id || tr.traceId || `trace-${idx}`;
+                  const rootSpan = tr.root_name || tr.rootSpan || 'Root';
+                  const serviceName = tr.root_service || tr.service || 'unknown';
+                  const isError = (tr.error_spans != null ? tr.error_spans > 0 : ((tr.statusCode || 200) >= 400 || tr.errorCount > 0));
+                  const duration = tr.duration_ms != null ? Number(tr.duration_ms).toFixed(1) : (tr.durationMs || 0);
+                  const spanCount = tr.span_count ?? tr.spanCount ?? 1;
+                  const time = tr.trace_start_time || tr.start_time || tr.timestamp;
+
+                  return (
+                    <tr
+                      key={traceId}
+                      onClick={() => openTrace(traceId)}
+                      style={{
+                        borderBottom: '1px solid var(--border-subtle)',
+                        cursor: 'pointer',
+                        transition: 'background-color 0.15s',
+                      }}
+                      onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = 'var(--surface-hover)')}
+                      onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = 'transparent')}
+                    >
+                      <td style={{ padding: '14px', fontFamily: 'var(--font-mono)', color: 'var(--accent)', fontWeight: 600 }}>
+                        {traceId}
+                      </td>
+                      <td style={{ padding: '14px', fontWeight: 500, color: 'var(--text)' }}>
+                        {rootSpan}
+                      </td>
+                      <td style={{ padding: '14px', color: 'var(--text-secondary)' }}>
+                        <span style={{ padding: '2px 8px', borderRadius: 'var(--radius-sm)', backgroundColor: 'var(--surface-input)', border: '1px solid var(--border)', fontSize: '11px', fontFamily: 'var(--font-mono)' }}>
+                          {serviceName}
+                        </span>
+                      </td>
+                      <td style={{ padding: '14px' }}>
+                        <StatusBadge
+                          status={isError ? 'error' : 'ok'}
+                          label={isError ? 'Error' : '200 OK'}
+                          size="sm"
+                        />
+                      </td>
+                      <td style={{ padding: '14px', fontFamily: 'var(--font-mono)', color: 'var(--text-muted)' }}>
+                        {spanCount}
+                      </td>
+                      <td style={{ padding: '14px', fontFamily: 'var(--font-mono)', fontWeight: 600, color: Number(duration) > 100 ? 'var(--warn)' : 'var(--text)' }}>
+                        {duration}ms
+                      </td>
+                      <td style={{ padding: '14px', textAlign: 'right', color: 'var(--text-dim)', fontSize: '12px' }}>
+                        {time ? new Date(time).toLocaleTimeString() : 'N/A'}
+                      </td>
+                    </tr>
+                  );
+                })
+              )}
             </tbody>
           </table>
         </div>

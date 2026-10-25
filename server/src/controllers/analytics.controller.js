@@ -12,7 +12,7 @@ function gatewayUrl(path) {
 }
 
 function resolveOrgId(req) {
-  return req.params.orgId || req.query.orgId || req.headers['x-organization-id'];
+  return req.orgId || req.params.orgId || req.query.orgId || req.headers['x-org-id'] || req.headers['x-organization-id'];
 }
 
 async function proxy(req, res, next, suffix) {

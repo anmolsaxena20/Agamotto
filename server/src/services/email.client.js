@@ -28,6 +28,7 @@ const target = `${host}:${port}`;
 
 const client = new emailProto.EmailService(target, grpc.credentials.createInsecure());
 
+const tracer = trace.getTracer('server.grpc');
 const meter = metrics.getMeter('server.grpc');
 const rpcClientCounter = meter.createCounter('rpc.client.request.count');
 const rpcClientDuration = meter.createHistogram('rpc.client.duration', { unit: 'ms' });
@@ -35,7 +36,7 @@ const rpcClientDuration = meter.createHistogram('rpc.client.duration', { unit: '
 export function sendOtpEmail(email, type, name = '') {
   return new Promise((resolve, reject) => {
     const started = performance.now();
-    const span = trace.getTracer('server.grpc').startSpan('email.EmailService/SendOtp', { kind: SpanKind.CLIENT });
+    const span = tracer.startSpan('email.EmailService/SendOtp', { kind: SpanKind.CLIENT });
     const metadata = injectGrpcContext(new grpc.Metadata(), trace.setSpan(context.active(), span));
     client.SendOtp({ email, type, name }, metadata, (err, response) => {
       const elapsed = performance.now() - started;

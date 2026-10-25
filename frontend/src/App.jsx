@@ -13,6 +13,7 @@ import { NotFoundPage } from './features/misc/NotFoundPage.jsx';
 // Layout & Components
 import { AppHeader } from './components/AppHeader.jsx';
 import { Sidebar } from './components/Sidebar.jsx';
+import { ErrorBoundary } from './components/ErrorBoundary.jsx';
 
 // Telemetry Views
 import { TelemetryOverviewView } from './features/telemetry/TelemetryOverviewView.jsx';
@@ -29,9 +30,6 @@ import { ResourcesView } from './features/telemetry/ResourcesView.jsx';
 import { OrganizationsView } from './features/org/OrganizationsView.jsx';
 import { MembersView } from './features/org/MembersView.jsx';
 import { KeysView } from './features/org/KeysView.jsx';
-
-// Email Template Preview
-import { EmailTemplateView } from './features/email/EmailTemplateView.jsx';
 
 /**
  * Protected Dashboard Shell with Sidebar and Subviews
@@ -93,7 +91,6 @@ function DashboardShell() {
     'organizations',
     'members',
     'keys',
-    'email-preview',
   ];
 
   // If garbage sub-path was entered in dashboard URL (e.g. /dashboard/overvie), render 404
@@ -143,50 +140,50 @@ function DashboardShell() {
             height: 'calc(100vh - 60px)',
           }}
         >
-          {tab === 'overview' && (
-            <TelemetryOverviewView
-              onSelectService={navigateToService}
-              onSelectTrace={navigateToTrace}
-              onNavigate={(targetTab) => navigate(`/dashboard/${targetTab}`)}
-            />
-          )}
+          <ErrorBoundary key={tab}>
+            {tab === 'overview' && (
+              <TelemetryOverviewView
+                onSelectService={navigateToService}
+                onSelectTrace={navigateToTrace}
+                onNavigate={(targetTab) => navigate(`/dashboard/${targetTab}`)}
+              />
+            )}
 
-          {tab === 'services' && (
-            <ServicesView
-              initialService={scopedService}
-              onSelectTrace={navigateToTrace}
-            />
-          )}
+            {tab === 'services' && (
+              <ServicesView
+                initialService={scopedService}
+                onSelectTrace={navigateToTrace}
+              />
+            )}
 
-          {tab === 'latency' && <LatencyView />}
+            {tab === 'latency' && <LatencyView />}
 
-          {tab === 'throughput' && <ThroughputView />}
+            {tab === 'throughput' && <ThroughputView />}
 
-          {tab === 'endpoints' && (
-            <EndpointsView onSelectEndpoint={() => navigate('/dashboard/traces')} />
-          )}
+            {tab === 'endpoints' && (
+              <EndpointsView onSelectEndpoint={() => navigate('/dashboard/traces')} />
+            )}
 
-          {tab === 'graph' && (
-            <DependencyGraphView onSelectService={navigateToService} />
-          )}
+            {tab === 'graph' && (
+              <DependencyGraphView onSelectService={navigateToService} />
+            )}
 
-          {tab === 'traces' && (
-            <TracesView initialTraceId={scopedTraceId} />
-          )}
+            {tab === 'traces' && (
+              <TracesView initialTraceId={scopedTraceId} />
+            )}
 
-          {tab === 'logs' && (
-            <LogsView onSelectTrace={navigateToTrace} />
-          )}
+            {tab === 'logs' && (
+              <LogsView onSelectTrace={navigateToTrace} />
+            )}
 
-          {tab === 'resources' && <ResourcesView />}
+            {tab === 'resources' && <ResourcesView />}
 
-          {tab === 'organizations' && <OrganizationsView />}
+            {tab === 'organizations' && <OrganizationsView />}
 
-          {tab === 'members' && <MembersView />}
+            {tab === 'members' && <MembersView />}
 
-          {tab === 'keys' && <KeysView />}
-
-          {tab === 'email-preview' && <EmailTemplateView />}
+            {tab === 'keys' && <KeysView />}
+          </ErrorBoundary>
         </main>
       </div>
     </div>

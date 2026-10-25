@@ -15,6 +15,8 @@ import { authenticate } from '../middleware/authenticate.js';
 
 const router = Router();
 
+const CLIENT_URL = process.env.CLIENT_URL || process.env.FRONTEND_URL || 'http://localhost:5173';
+
 router.post('/signup', signup);
 router.post('/verify-email', verifyEmail);
 router.post('/login', login);
@@ -36,7 +38,7 @@ router.get(
   '/google/callback',
   passport.authenticate('google', {
     session: false,
-    failureRedirect: '/auth/login?error=GoogleAuthFailed',
+    failureRedirect: `${CLIENT_URL}/login?error=GoogleAuthFailed`,
   }),
   oauthCallback
 );
@@ -53,7 +55,7 @@ router.get(
   '/github/callback',
   passport.authenticate('github', {
     session: false,
-    failureRedirect: '/auth/login?error=GitHubAuthFailed',
+    failureRedirect: `${CLIENT_URL}/login?error=GitHubAuthFailed`,
   }),
   oauthCallback
 );

@@ -169,7 +169,7 @@ export function createAnalyticsHandler(store) {
         if (status === 'error') whereClause += 'AND status_code = 2 ';
         if (status === 'ok') whereClause += 'AND status_code != 2 ';
 
-        query = `SELECT trace_id, any(service_name) AS root_service, any(name) AS root_name, min(start_time) AS start_time, (max(start_time + toIntervalNanosecond(duration_ns)) - min(start_time)) / 1000000.0 AS duration_ms, count() AS span_count, countIf(status_code = 2) AS error_spans FROM ${db}.trace_spans WHERE organization_id = {organizationId:UUID} AND start_time >= {since:DateTime64(3)} AND start_time <= {until:DateTime64(3)} ${whereClause}GROUP BY trace_id HAVING 1=1 ${minDurationMs ? 'AND duration_ms >= {minDurationMs:Float64}' : ''} ORDER BY start_time DESC LIMIT {limit:UInt16} OFFSET {offset:UInt32}`;
+        query = `SELECT trace_id, any(service_name) AS root_service, any(name) AS root_name, min(start_time) AS trace_start_time, (max(start_time + toIntervalNanosecond(duration_ns)) - min(start_time)) / 1000000.0 AS duration_ms, count() AS span_count, countIf(status_code = 2) AS error_spans FROM ${db}.trace_spans WHERE organization_id = {organizationId:UUID} AND start_time >= {since:DateTime64(3)} AND start_time <= {until:DateTime64(3)} ${whereClause}GROUP BY trace_id HAVING 1=1 ${minDurationMs ? 'AND duration_ms >= {minDurationMs:Float64}' : ''} ORDER BY trace_start_time DESC LIMIT {limit:UInt16} OFFSET {offset:UInt32}`;
         if (minDurationMs) params.minDurationMs = Number(minDurationMs);
       } else if (route.startsWith('traces/')) {
         const traceId = route.substring('traces/'.length);

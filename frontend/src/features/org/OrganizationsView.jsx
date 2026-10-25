@@ -165,11 +165,10 @@ export function OrganizationsView() {
                   Edit
                 </Button>
                 <Button
-                  variant="ghost"
+                  variant="danger"
                   size="sm"
                   icon={Trash2}
                   onClick={(e) => handleDelete(org.id, e)}
-                  style={{ color: 'var(--error)' }}
                 >
                   Delete
                 </Button>

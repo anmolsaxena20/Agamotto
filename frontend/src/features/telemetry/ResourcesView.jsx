@@ -36,13 +36,7 @@ export function ResourcesView() {
     fetchResources();
   }, [currentOrg?.id]);
 
-  const services = overview?.services || [
-    { service: 'server-gateway', cpuPercent: 18.4, memoryMb: 142.5, memoryLimitMb: 512, status: 'ok' },
-    { service: 'ingestion-gateway', cpuPercent: 34.2, memoryMb: 310.0, memoryLimitMb: 1024, status: 'ok' },
-    { service: 'email-service', cpuPercent: 4.8, memoryMb: 88.2, memoryLimitMb: 256, status: 'ok' },
-    { service: 'clickhouse-cluster', cpuPercent: 28.6, memoryMb: 1480.0, memoryLimitMb: 4096, status: 'ok' },
-    { service: 'postgres-db', cpuPercent: 12.1, memoryMb: 420.0, memoryLimitMb: 2048, status: 'ok' },
-  ];
+  const services = overview?.services || [];
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
@@ -60,7 +54,18 @@ export function ResourcesView() {
       </div>
 
       {/* Service Resource Cards */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(320px, 1fr))', gap: '16px' }}>
+      {services.length === 0 ? (
+        <Card style={{ padding: '48px 24px', textAlign: 'center' }}>
+          <Cpu size={36} style={{ color: 'var(--text-dim)', margin: '0 auto 12px' }} />
+          <h3 style={{ fontSize: '15px', fontWeight: 600, color: 'var(--text)', marginBottom: '6px' }}>
+            No System Resource Metrics Detected
+          </h3>
+          <p style={{ fontSize: '13px', color: 'var(--text-muted)', maxWidth: '440px', margin: '0 auto', lineHeight: 1.5 }}>
+            Container CPU and memory utilization metrics will appear here when telemetry gauges are reported by your ingestion pipeline.
+          </p>
+        </Card>
+      ) : (
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(320px, 1fr))', gap: '16px' }}>
         {services.map((svc) => {
           const memPercent = Math.min(100, Math.round((svc.memoryMb / (svc.memoryLimitMb || 512)) * 100));
           const cpuColor = svc.cpuPercent > 80 ? 'var(--error)' : svc.cpuPercent > 50 ? 'var(--warn)' : 'var(--ok)';
@@ -124,6 +129,7 @@ export function ResourcesView() {
           );
         })}
       </div>
+      )}
     </div>
   );
 }

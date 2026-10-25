@@ -4,6 +4,8 @@ import { shutdownTelemetry, startTelemetry, logger } from './src/observability/i
 
 validateEnv();
 await startTelemetry({ serviceName: 'server' });
+const { ensureMasterPermissions } = await import('./src/services/rbac.service.js');
+await ensureMasterPermissions();
 const { createApp } = await import('./src/app.js');
 
 const log = logger('server');

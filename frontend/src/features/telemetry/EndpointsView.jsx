@@ -29,10 +29,12 @@ export function EndpointsView({ onSelectEndpoint }) {
     fetchEndpoints();
   }, [currentOrg?.id]);
 
-  const filtered = endpoints.filter((e) =>
-    e.path.toLowerCase().includes(search.toLowerCase()) ||
-    e.service.toLowerCase().includes(search.toLowerCase())
-  );
+  const filtered = endpoints.filter((e) => {
+    const route = (e.endpoint || e.path || '').toLowerCase();
+    const service = (e.service_name || e.service || '').toLowerCase();
+    const q = search.toLowerCase();
+    return route.includes(q) || service.includes(q);
+  });
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
@@ -94,55 +96,83 @@ export function EndpointsView({ onSelectEndpoint }) {
               </tr>
             </thead>
             <tbody>
-              {filtered.map((ep, idx) => {
-                const methodColor = ep.method === 'POST' ? 'var(--ok)' : ep.method === 'GET' ? 'var(--accent)' : 'var(--warn)';
-                return (
-                  <tr
-                    key={idx}
-                    onClick={() => onSelectEndpoint?.(ep.path)}
-                    style={{
-                      borderBottom: '1px solid var(--border-subtle)',
-                      cursor: 'pointer',
-                      transition: 'background-color 0.15s',
-                    }}
-                    onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = 'var(--surface-hover)')}
-                    onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = 'transparent')}
-                  >
-                    <td style={{ padding: '14px', fontFamily: 'var(--font-mono)' }}>
-                      <span style={{ color: methodColor, fontWeight: 700, marginRight: '8px' }}>
-                        {ep.method}
-                      </span>
-                      <span style={{ color: 'var(--text)' }}>
-                        {ep.path.replace(/^(GET|POST|PATCH|DELETE)\s+/, '')}
-                      </span>
-                    </td>
-                    <td style={{ padding: '14px' }}>
-                      <span style={{ padding: '2px 8px', borderRadius: 'var(--radius-sm)', backgroundColor: 'var(--surface-input)', border: '1px solid var(--border)', fontSize: '11px', fontFamily: 'var(--font-mono)' }}>
-                        {ep.service}
-                      </span>
-                    </td>
-                    <td style={{ padding: '14px', fontFamily: 'var(--font-mono)' }}>
-                      {Number(ep.count).toLocaleString()}
-                    </td>
-                    <td style={{ padding: '14px', fontFamily: 'var(--font-mono)', color: 'var(--ok)' }}>
-                      {ep.p50}ms
-                    </td>
-                    <td style={{ padding: '14px', fontFamily: 'var(--font-mono)', color: 'var(--accent)' }}>
-                      {ep.p95}ms
-                    </td>
-                    <td style={{ padding: '14px', fontFamily: 'var(--font-mono)', color: 'var(--warn)', fontWeight: 600 }}>
-                      {ep.p99}ms
-                    </td>
-                    <td style={{ padding: '14px' }}>
-                      <StatusBadge
-                        status={ep.errorRate > 0.5 ? 'warn' : 'ok'}
-                        label={`${ep.errorRate}%`}
-                        size="sm"
-                      />
-                    </td>
-                  </tr>
-                );
-              })}
+              {filtered.length === 0 ? (
+                <tr>
+                  <td colSpan={7} style={{ padding: '36px', textAlign: 'center', color: 'var(--text-muted)' }}>
+                    {isLoading ? 'Loading route endpoints...' : 'No endpoint telemetry recorded for this organization.'}
+                  </td>
+                </tr>
+              ) : (
+                filtered.map((ep, idx) => {
+                  const rawRoute = ep.endpoint || ep.path || 'UNKNOWN';
+                  const serviceName = ep.service_name || ep.service || 'unknown-service';
+                  const invocations = ep.total_calls ?? ep.count ?? 0;
+                  const p50 = ep.p50_ms ?? ep.p50 ?? 0;
+                  const p95 = ep.p95_ms ?? ep.p95 ?? 0;
+                  const p99 = ep.p99_ms ?? ep.p99 ?? 0;
+                  const errorRate = Number(ep.error_rate != null ? (ep.error_rate * 100).toFixed(2) : ep.errorRate || 0);
+
+                  // Extract method if formatted like "GET /api/v1/users"
+                  const parts = rawRoute.trim().split(/\s+/);
+                  let method = ep.method;
+                  let displayRoute = rawRoute;
+                  if (parts.length >= 2 && ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'HEAD', 'OPTIONS'].includes(parts[0].toUpperCase())) {
+                    method = parts[0].toUpperCase();
+                    displayRoute = parts.slice(1).join(' ');
+                  } else if (!method) {
+                    method = 'HTTP';
+                  }
+
+                  const methodColor = method === 'POST' ? 'var(--ok)' : method === 'GET' ? 'var(--accent)' : 'var(--warn)';
+
+                  return (
+                    <tr
+                      key={idx}
+                      onClick={() => onSelectEndpoint?.(displayRoute)}
+                      style={{
+                        borderBottom: '1px solid var(--border-subtle)',
+                        cursor: 'pointer',
+                        transition: 'background-color 0.15s',
+                      }}
+                      onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = 'var(--surface-hover)')}
+                      onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = 'transparent')}
+                    >
+                      <td style={{ padding: '14px', fontFamily: 'var(--font-mono)' }}>
+                        <span style={{ color: methodColor, fontWeight: 700, marginRight: '8px' }}>
+                          {method}
+                        </span>
+                        <span style={{ color: 'var(--text)' }}>
+                          {displayRoute}
+                        </span>
+                      </td>
+                      <td style={{ padding: '14px' }}>
+                        <span style={{ padding: '2px 8px', borderRadius: 'var(--radius-sm)', backgroundColor: 'var(--surface-input)', border: '1px solid var(--border)', fontSize: '11px', fontFamily: 'var(--font-mono)' }}>
+                          {serviceName}
+                        </span>
+                      </td>
+                      <td style={{ padding: '14px', fontFamily: 'var(--font-mono)' }}>
+                        {Number(invocations).toLocaleString()}
+                      </td>
+                      <td style={{ padding: '14px', fontFamily: 'var(--font-mono)', color: 'var(--ok)' }}>
+                        {p50}ms
+                      </td>
+                      <td style={{ padding: '14px', fontFamily: 'var(--font-mono)', color: 'var(--accent)' }}>
+                        {p95}ms
+                      </td>
+                      <td style={{ padding: '14px', fontFamily: 'var(--font-mono)', color: 'var(--warn)', fontWeight: 600 }}>
+                        {p99}ms
+                      </td>
+                      <td style={{ padding: '14px' }}>
+                        <StatusBadge
+                          status={errorRate > 0.5 ? 'warn' : 'ok'}
+                          label={`${errorRate}%`}
+                          size="sm"
+                        />
+                      </td>
+                    </tr>
+                  );
+                })
+              )}
             </tbody>
           </table>
         </div>

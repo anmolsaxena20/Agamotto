@@ -29,24 +29,8 @@ export function DependencyGraphView({ onSelectService }) {
     fetchGraph();
   }, [currentOrg?.id]);
 
-  const nodes = graphData?.nodes || [
-    { id: 'client', name: 'Browser / Clients', type: 'external', status: 'ok', x: 80, y: 160 },
-    { id: 'server-gateway', name: 'Server Gateway', type: 'service', status: 'ok', rps: 185, x: 280, y: 90 },
-    { id: 'ingestion-gateway', name: 'OTLP Ingestion', type: 'service', status: 'ok', rps: 840, x: 280, y: 230 },
-    { id: 'auth-service', name: 'Auth Controller', type: 'service', status: 'ok', rps: 45, x: 480, y: 60 },
-    { id: 'email-service', name: 'Email Dispatcher', type: 'service', status: 'warn', rps: 12, x: 680, y: 60 },
-    { id: 'clickhouse', name: 'ClickHouse Telemetry', type: 'database', status: 'ok', rps: 920, p99: 29.8, x: 580, y: 230 },
-    { id: 'postgres', name: 'Postgres DB', type: 'database', status: 'ok', rps: 220, p99: 51.2, x: 500, y: 140 },
-  ];
-
-  const edges = graphData?.edges || [
-    { source: 'client', target: 'server-gateway', p99: 64.0, callCount: 185000 },
-    { source: 'client', target: 'ingestion-gateway', p99: 42.1, callCount: 840000 },
-    { source: 'server-gateway', target: 'auth-service', p99: 88.0, callCount: 45000 },
-    { source: 'auth-service', target: 'email-service', p99: 340.5, callCount: 12000, errorCount: 174 },
-    { source: 'server-gateway', target: 'postgres', p99: 45.0, callCount: 120000 },
-    { source: 'ingestion-gateway', target: 'clickhouse', p99: 29.8, callCount: 840000 },
-  ];
+  const nodes = graphData?.nodes || [];
+  const edges = graphData?.edges || [];
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
@@ -64,8 +48,19 @@ export function DependencyGraphView({ onSelectService }) {
       </div>
 
       {/* SVG Canvas Card */}
-      <Card style={{ padding: '24px', overflowX: 'auto' }}>
-        <div style={{ minWidth: '800px', position: 'relative' }}>
+      {nodes.length === 0 ? (
+        <Card style={{ padding: '48px 24px', textAlign: 'center' }}>
+          <Share2 size={36} style={{ color: 'var(--text-dim)', margin: '0 auto 12px' }} />
+          <h3 style={{ fontSize: '15px', fontWeight: 600, color: 'var(--text)', marginBottom: '6px' }}>
+            No Service Topology Detected
+          </h3>
+          <p style={{ fontSize: '13px', color: 'var(--text-muted)', maxWidth: '440px', margin: '0 auto', lineHeight: 1.5 }}>
+            Distributed call relationships, network hops, and database queries will automatically construct your topology map as traces flow in.
+          </p>
+        </Card>
+      ) : (
+        <Card style={{ padding: '24px', overflowX: 'auto' }}>
+          <div style={{ minWidth: '800px', position: 'relative' }}>
           <svg width="100%" height="340" viewBox="0 0 820 340" style={{ overflow: 'visible' }}>
             <defs>
               <linearGradient id="edgeGrad" x1="0%" y1="0%" x2="100%" y2="0%">
@@ -174,6 +169,7 @@ export function DependencyGraphView({ onSelectService }) {
           </svg>
         </div>
       </Card>
+      )}
 
       {/* Selected Node Inspector */}
       {selectedNode && (

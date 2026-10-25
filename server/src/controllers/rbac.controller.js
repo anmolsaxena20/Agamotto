@@ -75,7 +75,10 @@ export async function createGroup(req, res, next) {
 
     if (Array.isArray(permissionIds) && permissionIds.length > 0) {
       for (const permId of permissionIds) {
-        const perm = await db.orm.public.Permission.where({ id: permId }).first();
+        let perm = await db.orm.public.Permission.where({ id: permId }).first();
+        if (!perm) {
+          perm = await db.orm.public.Permission.where({ key: permId }).first();
+        }
         if (perm) {
           await db.orm.public.GroupPermissionAssignment.create({
             groupId: group.id,

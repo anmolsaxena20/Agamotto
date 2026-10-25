@@ -11,6 +11,7 @@ export function Button({
   className = '',
   type = 'button',
   onClick,
+  style = {},
   ...props
 }) {
   const baseStyle = {
@@ -60,9 +61,10 @@ export function Button({
       borderColor: 'var(--border)',
     },
     danger: {
-      backgroundColor: 'var(--error)',
-      color: '#ffffff',
-      borderColor: 'var(--error)',
+      backgroundColor: 'rgba(239, 68, 68, 0.1)',
+      color: 'var(--error)',
+      borderColor: 'rgba(239, 68, 68, 0.35)',
+      boxShadow: '0 2px 8px rgba(239, 68, 68, 0.15)',
     },
     ghost: {
       backgroundColor: 'transparent',
@@ -75,6 +77,7 @@ export function Button({
     ...baseStyle,
     ...sizeStyles[size],
     ...variantStyles[variant],
+    ...style,
   };
 
   const handleMouseEnter = (e) => {
@@ -86,6 +89,11 @@ export function Button({
       e.currentTarget.style.backgroundColor = 'var(--surface-hover)';
       e.currentTarget.style.borderColor = 'var(--text-muted)';
       e.currentTarget.style.color = '#ffffff';
+    } else if (variant === 'danger') {
+      e.currentTarget.style.backgroundColor = 'rgba(239, 68, 68, 0.22)';
+      e.currentTarget.style.borderColor = 'var(--error)';
+      e.currentTarget.style.color = '#ff6b6b';
+      e.currentTarget.style.boxShadow = '0 0 12px rgba(239, 68, 68, 0.35)';
     } else if (variant === 'ghost') {
       e.currentTarget.style.color = 'var(--text)';
       e.currentTarget.style.backgroundColor = 'var(--surface-subtle)';
@@ -101,6 +109,11 @@ export function Button({
       e.currentTarget.style.backgroundColor = 'transparent';
       e.currentTarget.style.borderColor = 'var(--border)';
       e.currentTarget.style.color = 'var(--text)';
+    } else if (variant === 'danger') {
+      e.currentTarget.style.backgroundColor = 'rgba(239, 68, 68, 0.1)';
+      e.currentTarget.style.borderColor = 'rgba(239, 68, 68, 0.35)';
+      e.currentTarget.style.color = 'var(--error)';
+      e.currentTarget.style.boxShadow = '0 2px 8px rgba(239, 68, 68, 0.15)';
     } else if (variant === 'ghost') {
       e.currentTarget.style.color = 'var(--text-muted)';
       e.currentTarget.style.backgroundColor = 'transparent';

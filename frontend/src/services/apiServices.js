@@ -126,10 +126,10 @@ export const rbacService = {
     return apiRequest(`/orgs/${orgId}/groups`, { method: 'GET' });
   },
 
-  async createGroup(orgId, { name, description }) {
+  async createGroup(orgId, { name, code, description, permissionIds }) {
     return apiRequest(`/orgs/${orgId}/groups`, {
       method: 'POST',
-      body: JSON.stringify({ name, description }),
+      body: JSON.stringify({ name, code, description, permissionIds }),
     });
   },
 
