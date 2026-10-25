@@ -1,0 +1,29 @@
+[build-system]
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "eye-of-agamotto-ai-service"
+version = "0.1.0"
+description = "Eye of Agamotto AI and Anomaly Detection Service"
+authors = [{ name = "Team Vortex" }]
+dependencies = [
+    "fastapi>=0.110.0",
+    "uvicorn>=0.28.0",
+    "pydantic>=2.5.0",
+    "duckdb>=0.10.0",
+    "pyjwt>=2.8.0",
+    "httpx>=0.27.0",
+    "mcp>=2.3.0",
+]
+
+[project.optional-dependencies]
+test = [
+    "pytest>=8.0.0",
+    "pytest-asyncio>=0.23.0",
+]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["."]
+asyncio_mode = "auto"
