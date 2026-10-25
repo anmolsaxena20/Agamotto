@@ -4,6 +4,7 @@ import { StatusBadge } from '../../components/StatusBadge.jsx';
 import { Button } from '../../components/Button.jsx';
 import { analyticsService } from '../../services/apiServices.js';
 import { useOrg } from '../../context/OrgContext.jsx';
+import { formatLatency, formatLatencyNum, formatPercent } from '../../utils/formatters.js';
 import {
   Activity,
   ArrowUpRight,
@@ -55,7 +56,7 @@ export function TelemetryOverviewView({ onSelectService, onSelectTrace, onNaviga
   const totalSpans = overview?.total_spans ?? overview?.totalSpans ?? 0;
   const totalRequests = overview?.total_requests ?? overview?.totalRequests ?? 0;
   const errorRateRaw = overview?.error_rate ?? overview?.errorRate ?? 0;
-  const errorRateFormatted = (Number(errorRateRaw) * (errorRateRaw <= 1 && errorRateRaw > 0 ? 100 : 1)).toFixed(2);
+  const errorRateFormatted = formatPercent(errorRateRaw);
   const p50 = overview?.p50_ms ?? overview?.p50 ?? 0;
   const p95 = overview?.p95_ms ?? overview?.p95 ?? 0;
   const p99 = overview?.p99_ms ?? overview?.p99 ?? 0;
@@ -134,21 +135,21 @@ export function TelemetryOverviewView({ onSelectService, onSelectTrace, onNaviga
             <span className="text-small" style={{ textTransform: 'uppercase', letterSpacing: '0.05em' }}>
               Aggregate Error Rate
             </span>
-            <AlertTriangle size={16} style={{ color: Number(errorRateFormatted) > 1 ? 'var(--warn)' : 'var(--ok)' }} />
+            <AlertTriangle size={16} style={{ color: Number(parseFloat(errorRateFormatted)) > 1 ? 'var(--warn)' : 'var(--ok)' }} />
           </div>
           <div>
             <div
               style={{
                 fontSize: '24px',
                 fontWeight: 700,
-                color: Number(errorRateFormatted) > 1 ? 'var(--warn)' : 'var(--ok)',
+                color: Number(parseFloat(errorRateFormatted)) > 1 ? 'var(--warn)' : 'var(--ok)',
                 fontFamily: 'var(--font-mono)',
               }}
             >
-              {errorRateFormatted}%
+              {errorRateFormatted}
             </div>
             <div style={{ fontSize: '11px', color: 'var(--text-muted)', marginTop: '2px' }}>
-              Target SLA &lt; 1.0%
+              Target SLA &lt; 1.00%
             </div>
           </div>
         </Card>
@@ -163,7 +164,7 @@ export function TelemetryOverviewView({ onSelectService, onSelectTrace, onNaviga
           </div>
           <div>
             <div style={{ fontSize: '24px', fontWeight: 700, color: 'var(--text)', fontFamily: 'var(--font-mono)' }}>
-              {p50} ms
+              {formatLatency(p50)}
             </div>
             <div style={{ fontSize: '11px', color: 'var(--ok)', marginTop: '2px' }}>
               Median baseline
@@ -181,7 +182,7 @@ export function TelemetryOverviewView({ onSelectService, onSelectTrace, onNaviga
           </div>
           <div>
             <div style={{ fontSize: '24px', fontWeight: 700, color: 'var(--text)', fontFamily: 'var(--font-mono)' }}>
-              {p95} ms
+              {formatLatency(p95)}
             </div>
             <div style={{ fontSize: '11px', color: 'var(--text-muted)', marginTop: '2px' }}>
               SLA benchmark
@@ -199,7 +200,7 @@ export function TelemetryOverviewView({ onSelectService, onSelectTrace, onNaviga
           </div>
           <div>
             <div style={{ fontSize: '24px', fontWeight: 700, color: 'var(--warn)', fontFamily: 'var(--font-mono)' }}>
-              {p99} ms
+              {formatLatency(p99)}
             </div>
             <div style={{ fontSize: '11px', color: 'var(--text-muted)', marginTop: '2px' }}>
               Worst-case peak
@@ -235,9 +236,9 @@ export function TelemetryOverviewView({ onSelectService, onSelectTrace, onNaviga
             {servicesData.map((svc, sIdx) => {
               const svcName = svc.service_name || svc.name || `service-${sIdx}`;
               const svcSpans = svc.spans ?? svc.total_spans ?? svc.requests ?? 0;
-              const svcErrRate = Number(svc.error_rate != null ? (svc.error_rate * 100).toFixed(2) : svc.errorRate || 0);
+              const svcErrRate = formatPercent(svc.error_rate != null ? svc.error_rate : svc.errorRate || 0);
               const svcP99 = svc.p99_ms ?? svc.p99 ?? 0;
-              const isNominal = svcErrRate <= 1;
+              const isNominal = parseFloat(svcErrRate) <= 1;
 
               return (
                 <Card
@@ -311,17 +312,17 @@ export function TelemetryOverviewView({ onSelectService, onSelectTrace, onNaviga
                           fontSize: '13px',
                           fontWeight: 600,
                           fontFamily: 'var(--font-mono)',
-                          color: svcErrRate > 1 ? 'var(--warn)' : 'var(--ok)',
+                          color: parseFloat(svcErrRate) > 1 ? 'var(--warn)' : 'var(--ok)',
                         }}
                       >
-                        {svcErrRate}%
+                        {svcErrRate}
                       </div>
                     </div>
 
                     <div>
                       <div style={{ fontSize: '10px', color: 'var(--text-muted)', textTransform: 'uppercase' }}>p99 Latency</div>
                       <div style={{ fontSize: '13px', fontWeight: 600, fontFamily: 'var(--font-mono)', color: 'var(--accent)' }}>
-                        {svcP99}ms
+                        {formatLatency(svcP99)}
                       </div>
                     </div>
                   </div>
@@ -420,7 +421,7 @@ export function TelemetryOverviewView({ onSelectService, onSelectTrace, onNaviga
                           </span>
                         </div>
                         <div style={{ fontSize: '12px', color: 'var(--text-muted)', marginTop: '2px' }}>
-                          p99 duration: {err.p99_ms != null ? `${err.p99_ms}ms` : 'N/A'}
+                          p99 duration: {formatLatency(err.p99_ms)}
                         </div>
                       </div>
                     </div>

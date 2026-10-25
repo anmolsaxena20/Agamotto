@@ -4,6 +4,7 @@ import { Button } from '../../components/Button.jsx';
 import { StatusBadge } from '../../components/StatusBadge.jsx';
 import { analyticsService } from '../../services/apiServices.js';
 import { useOrg } from '../../context/OrgContext.jsx';
+import { formatLatency, formatPercent } from '../../utils/formatters.js';
 import { Network, RefreshCw, Search, ChevronRight } from 'lucide-react';
 
 export function EndpointsView({ onSelectEndpoint }) {
@@ -17,7 +18,8 @@ export function EndpointsView({ onSelectEndpoint }) {
     setIsLoading(true);
     try {
       const res = await analyticsService.getEndpoints(currentOrg.id);
-      setEndpoints(res?.data || []);
+      const list = Array.isArray(res?.data) ? res.data : (Array.isArray(res) ? res : []);
+      setEndpoints(list);
     } catch (err) {
       console.warn('Failed to fetch endpoints:', err);
     } finally {
@@ -110,7 +112,7 @@ export function EndpointsView({ onSelectEndpoint }) {
                   const p50 = ep.p50_ms ?? ep.p50 ?? 0;
                   const p95 = ep.p95_ms ?? ep.p95 ?? 0;
                   const p99 = ep.p99_ms ?? ep.p99 ?? 0;
-                  const errorRate = Number(ep.error_rate != null ? (ep.error_rate * 100).toFixed(2) : ep.errorRate || 0);
+                  const errRateFormatted = formatPercent(ep.error_rate != null ? ep.error_rate : ep.errorRate || 0);
 
                   // Extract method if formatted like "GET /api/v1/users"
                   const parts = rawRoute.trim().split(/\s+/);
@@ -154,18 +156,18 @@ export function EndpointsView({ onSelectEndpoint }) {
                         {Number(invocations).toLocaleString()}
                       </td>
                       <td style={{ padding: '14px', fontFamily: 'var(--font-mono)', color: 'var(--ok)' }}>
-                        {p50}ms
+                        {formatLatency(p50)}
                       </td>
                       <td style={{ padding: '14px', fontFamily: 'var(--font-mono)', color: 'var(--accent)' }}>
-                        {p95}ms
+                        {formatLatency(p95)}
                       </td>
                       <td style={{ padding: '14px', fontFamily: 'var(--font-mono)', color: 'var(--warn)', fontWeight: 600 }}>
-                        {p99}ms
+                        {formatLatency(p99)}
                       </td>
                       <td style={{ padding: '14px' }}>
                         <StatusBadge
-                          status={errorRate > 0.5 ? 'warn' : 'ok'}
-                          label={`${errorRate}%`}
+                          status={parseFloat(errRateFormatted) > 0.5 ? 'warn' : 'ok'}
+                          label={errRateFormatted}
                           size="sm"
                         />
                       </td>

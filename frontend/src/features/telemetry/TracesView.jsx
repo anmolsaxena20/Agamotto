@@ -5,6 +5,7 @@ import { StatusBadge } from '../../components/StatusBadge.jsx';
 import { Modal } from '../../components/Modal.jsx';
 import { analyticsService } from '../../services/apiServices.js';
 import { useOrg } from '../../context/OrgContext.jsx';
+import { formatLatency } from '../../utils/formatters.js';
 import {
   GitBranch,
   Search,
@@ -147,7 +148,7 @@ export function TracesView({ initialTraceId }) {
                         {spanCount}
                       </td>
                       <td style={{ padding: '14px', fontFamily: 'var(--font-mono)', fontWeight: 600, color: Number(duration) > 100 ? 'var(--warn)' : 'var(--text)' }}>
-                        {duration}ms
+                        {formatLatency(duration)}
                       </td>
                       <td style={{ padding: '14px', textAlign: 'right', color: 'var(--text-dim)', fontSize: '12px' }}>
                         {time ? new Date(time).toLocaleTimeString() : 'N/A'}

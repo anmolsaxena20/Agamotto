@@ -3,6 +3,7 @@ import { Card } from '../../components/Card.jsx';
 import { Button } from '../../components/Button.jsx';
 import { analyticsService } from '../../services/apiServices.js';
 import { useOrg } from '../../context/OrgContext.jsx';
+import { formatLatency } from '../../utils/formatters.js';
 import { Clock, RefreshCw, TrendingUp } from 'lucide-react';
 
 export function LatencyView() {
@@ -19,10 +20,10 @@ export function LatencyView() {
         analyticsService.getLatency(currentOrg.id),
         analyticsService.getLatencyTimeseries(currentOrg.id),
       ]);
-      const rawDist = Array.isArray(distRes?.data) ? distRes.data : (distRes?.distributions || []);
+      const rawDist = Array.isArray(distRes?.data) ? distRes.data : (Array.isArray(distRes) ? distRes : (distRes?.distributions || []));
       setDistributions(rawDist);
 
-      const rawTs = Array.isArray(tsRes?.data) ? tsRes.data : (tsRes?.timeseries || []);
+      const rawTs = Array.isArray(tsRes?.data) ? tsRes.data : (Array.isArray(tsRes) ? tsRes : (tsRes?.timeseries || []));
       setTimeseries(rawTs);
     } catch (err) {
       console.warn('Failed to fetch latency data:', err);
@@ -118,7 +119,7 @@ export function LatencyView() {
                 >
                   <div style={{ display: 'flex', alignItems: 'flex-end', gap: '2px', width: '100%', justifyContent: 'center' }}>
                     <div
-                      title={`p50: ${p50Val}ms`}
+                      title={`p50: ${formatLatency(p50Val)}`}
                       style={{
                         width: '6px',
                         height: `${Math.max(4, h50)}px`,
@@ -127,7 +128,7 @@ export function LatencyView() {
                       }}
                     />
                     <div
-                      title={`p95: ${p95Val}ms`}
+                      title={`p95: ${formatLatency(p95Val)}`}
                       style={{
                         width: '6px',
                         height: `${Math.max(6, h95)}px`,
@@ -136,7 +137,7 @@ export function LatencyView() {
                       }}
                     />
                     <div
-                      title={`p99: ${p99Val}ms`}
+                      title={`p99: ${formatLatency(p99Val)}`}
                       style={{
                         width: '6px',
                         height: `${Math.max(8, h99)}px`,
@@ -194,19 +195,19 @@ export function LatencyView() {
                         {svcName}
                       </td>
                       <td style={{ padding: '12px 14px', fontFamily: 'var(--font-mono)', color: 'var(--ok)' }}>
-                        {p50} ms
+                        {formatLatency(p50)}
                       </td>
                       <td style={{ padding: '12px 14px', fontFamily: 'var(--font-mono)', color: 'var(--text-secondary)' }}>
-                        {p90} ms
+                        {formatLatency(p90)}
                       </td>
                       <td style={{ padding: '12px 14px', fontFamily: 'var(--font-mono)', color: 'var(--accent)', fontWeight: 600 }}>
-                        {p95} ms
+                        {formatLatency(p95)}
                       </td>
                       <td style={{ padding: '12px 14px', fontFamily: 'var(--font-mono)', color: 'var(--warn)', fontWeight: 600 }}>
-                        {p99} ms
+                        {formatLatency(p99)}
                       </td>
                       <td style={{ padding: '12px 14px', fontFamily: 'var(--font-mono)', color: 'var(--error)' }}>
-                        {p999} ms
+                        {formatLatency(p999)}
                       </td>
                     </tr>
                   );
