@@ -1,6 +1,7 @@
 import crypto from 'node:crypto';
 import { db } from '../prisma/db.ts';
 import { provisionDefaultGroups, getMemberGroups } from '../services/rbac.service.js';
+import { sendTeamInvitationEmail } from '../services/email.client.js';
 
 export async function createOrg(req, res, next) {
   try {
@@ -236,6 +237,24 @@ export async function addMember(req, res, next) {
         groupId: targetGroup.id,
       });
     }
+
+    const org = await db.orm.public.Organization.where({ id: orgId }).first();
+    const inviterName = req.user?.name || req.user?.email || 'A team member';
+    const workspaceName = org?.name || 'Agamotto';
+    const roleName = targetGroup?.name || targetGroup?.code || 'Member';
+    const clientUrl = process.env.CLIENT_URL || process.env.FRONTEND_URL || 'http://localhost:5173';
+    const inviteUrl = `${clientUrl}/dashboard`;
+
+    sendTeamInvitationEmail({
+      email: normalizedEmail,
+      inviterName,
+      workspaceName,
+      roleName,
+      inviteUrl,
+    }).catch(err => {
+      // Non-blocking log if email service is unavailable
+      console.error('[sendTeamInvitationEmail] Failed:', err.message);
+    });
 
     return res.status(201).json({
       message: 'Member added successfully',

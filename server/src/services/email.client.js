@@ -59,6 +59,39 @@ export function sendOtpEmail(email, type, name = '') {
   });
 }
 
+export function sendTeamInvitationEmail({ email, inviterName, workspaceName, roleName, inviteUrl }) {
+  return new Promise((resolve, reject) => {
+    const started = performance.now();
+    const span = tracer.startSpan('email.EmailService/SendInvitation', { kind: SpanKind.CLIENT });
+    const metadata = injectGrpcContext(new grpc.Metadata(), trace.setSpan(context.active(), span));
+    client.SendInvitation(
+      {
+        email,
+        inviter_name: inviterName || '',
+        workspace_name: workspaceName || '',
+        role_name: roleName || '',
+        invite_url: inviteUrl || '',
+      },
+      metadata,
+      (err, response) => {
+        const elapsed = performance.now() - started;
+        const status = err ? 'error' : 'success';
+        const attrs = { 'rpc.service': 'email.EmailService', 'rpc.method': 'SendInvitation', 'rpc.status': status };
+        rpcClientCounter.add(1, attrs);
+        rpcClientDuration.record(elapsed, attrs);
+        if (err) span.recordException(err);
+        span.end();
+        if (err) {
+          log('ERROR', `Failed to send team invitation email: ${err.message}`, { 'rpc.method': 'SendInvitation', email, error: err.message });
+          return reject(err);
+        }
+        log('INFO', 'Successfully requested team invitation email delivery', { 'rpc.method': 'SendInvitation', email });
+        resolve(response);
+      }
+    );
+  });
+}
+
 export function checkEmailServiceHealth() {
   return new Promise((resolve, reject) => {
     const started = performance.now();

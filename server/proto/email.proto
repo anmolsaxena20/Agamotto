@@ -4,12 +4,13 @@ package email;
 
 service EmailService {
   rpc SendOtp (SendOtpRequest) returns (SendOtpResponse);
+  rpc SendInvitation (SendInvitationRequest) returns (SendInvitationResponse);
   rpc HealthCheck (HealthCheckRequest) returns (HealthCheckResponse);
 }
 
 message SendOtpRequest {
   string email = 1;
-  string type = 2;
+  string type = 2; // "signup" / "verification-template" or "forgot-password" / "password-reset"
   string name = 3;
 }
 
@@ -18,8 +19,22 @@ message SendOtpResponse {
   int64 expires_at = 2;
 }
 
+message SendInvitationRequest {
+  string email = 1;
+  string inviter_name = 2;
+  string workspace_name = 3;
+  string role_name = 4;
+  string invite_url = 5;
+}
+
+message SendInvitationResponse {
+  bool success = 1;
+  string message = 2;
+}
+
 message HealthCheckRequest {}
 
 message HealthCheckResponse {
   string status = 1;
 }
+
