@@ -62,7 +62,6 @@ export function createApp() {
   app.use('/auth', authRoutes);
   app.use('/orgs', orgRoutes);
   app.use('/orgs/:orgId/analytics', analyticsRoutes);
-  app.use('/analytics', analyticsRoutes);
   app.use('/permissions', permissionRoutes);
   app.use('/internal', internalRoutes);
 

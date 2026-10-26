@@ -98,6 +98,8 @@ export function createAnalyticsHandler(store) {
         params.offset = offset;
         query = `SELECT service_name, name AS endpoint, count() AS total_calls, countIf(status_code = 2) AS error_count, countIf(status_code = 2) / nullIf(count(), 0) AS error_rate, quantileTDigest(0.50)(duration_ns) / 1000000 AS p50_ms, quantileTDigest(0.95)(duration_ns) / 1000000 AS p95_ms, quantileTDigest(0.99)(duration_ns) / 1000000 AS p99_ms, avg(duration_ns) / 1000000 AS avg_ms FROM ${db}.trace_spans WHERE organization_id = {organizationId:UUID} AND start_time >= {since:DateTime64(3)} AND start_time <= {until:DateTime64(3)} ${service ? 'AND service_name = {service:String}' : ''} GROUP BY service_name, name ORDER BY total_calls DESC LIMIT {limit:UInt16} OFFSET {offset:UInt32}`;
       } else if (route === 'dependency-graph') {
+        const depSince = requestedSince ? since : new Date(Date.now() - 30 * 86400000).toISOString().replace('T', ' ').replace('Z', '');
+        params.since = depSince;
         query = `SELECT parent.service_name AS source, child.service_name AS target, count() AS calls, countIf(child.status_code = 2) AS error_count, quantileTDigest(0.50)(child.duration_ns) / 1000000 AS p50_ms, quantileTDigest(0.99)(child.duration_ns) / 1000000 AS p99_ms FROM ${db}.trace_spans child INNER JOIN ${db}.trace_spans parent ON child.organization_id = parent.organization_id AND child.trace_id = parent.trace_id AND child.parent_span_id = parent.span_id WHERE child.organization_id = {organizationId:UUID} AND child.start_time >= {since:DateTime64(3)} AND child.start_time <= {until:DateTime64(3)} AND parent.service_name != child.service_name GROUP BY source, target ORDER BY calls DESC`;
       } else if (route === 'service-overview') {
         query = `SELECT service_name, count() AS spans, countIf(status_code = 2) AS errors, errors / nullIf(spans, 0) AS error_rate, avg(duration_ns) / 1000000 AS avg_ms, quantileTDigest(0.50)(duration_ns) / 1000000 AS p50_ms, quantileTDigest(0.95)(duration_ns) / 1000000 AS p95_ms, quantileTDigest(0.99)(duration_ns) / 1000000 AS p99_ms FROM ${db}.trace_spans WHERE organization_id = {organizationId:UUID} AND start_time >= {since:DateTime64(3)} AND start_time <= {until:DateTime64(3)} GROUP BY service_name ORDER BY errors DESC, p99_ms DESC`;
@@ -110,8 +112,10 @@ export function createAnalyticsHandler(store) {
         query = `SELECT service_name, name AS endpoint, count() AS errors, any(start_time) AS last_seen, quantileTDigest(0.99)(duration_ns) / 1000000 AS p99_ms FROM ${db}.trace_spans WHERE organization_id = {organizationId:UUID} AND start_time >= {since:DateTime64(3)} AND start_time <= {until:DateTime64(3)} AND status_code = 2 ${service ? 'AND service_name = {service:String}' : ''} GROUP BY service_name, name ORDER BY errors DESC LIMIT {limit:UInt16} OFFSET {offset:UInt32}`;
       } else if (route === 'logs') {
         const regex = url.searchParams.get('regex');
-        const search = url.searchParams.get('search') || url.searchParams.get('query');
-        const severity = url.searchParams.get('severity');
+        const rawSearch = url.searchParams.get('search') || url.searchParams.get('query');
+        const search = rawSearch && rawSearch !== 'undefined' ? rawSearch : null;
+        const rawSeverity = url.searchParams.get('severity');
+        const severity = rawSeverity && rawSeverity !== 'ALL' && rawSeverity !== 'undefined' ? rawSeverity.toUpperCase() : null;
         const service = url.searchParams.get('service');
         const traceId = url.searchParams.get('traceId');
 
@@ -121,9 +125,9 @@ export function createAnalyticsHandler(store) {
           params.pattern = regex;
         }
         if (search) params.search = search;
-        if (severity && severity !== 'ALL') params.severity = severity.toUpperCase();
-        if (service) params.service = service;
-        if (traceId) params.traceId = traceId;
+        if (severity) params.severity = severity;
+        if (service && service !== 'undefined') params.service = service;
+        if (traceId && traceId !== 'undefined') params.traceId = traceId;
 
         isPaginated = true;
         params.limit = fetchLimit;
@@ -132,9 +136,9 @@ export function createAnalyticsHandler(store) {
         let whereExtra = '';
         if (regex) whereExtra += 'AND match(body, {pattern:String}) ';
         if (search) whereExtra += 'AND positionCaseInsensitive(body, {search:String}) > 0 ';
-        if (severity && severity !== 'ALL') whereExtra += 'AND severity_text = {severity:String} ';
-        if (service) whereExtra += 'AND service_name = {service:String} ';
-        if (traceId) whereExtra += 'AND trace_id = {traceId:String} ';
+        if (severity) whereExtra += 'AND severity_text = {severity:String} ';
+        if (service && service !== 'undefined') whereExtra += 'AND service_name = {service:String} ';
+        if (traceId && traceId !== 'undefined') whereExtra += 'AND trace_id = {traceId:String} ';
 
         query = `SELECT service_name, time, severity_number, severity_text, body, trace_id, span_id, attributes_json FROM ${db}.telemetry_logs WHERE organization_id = {organizationId:UUID} AND time >= {since:DateTime64(3)} AND time <= {until:DateTime64(3)} ${whereExtra}ORDER BY time DESC LIMIT {limit:UInt16} OFFSET {offset:UInt32}`;
       } else if (route === 'metrics') {
