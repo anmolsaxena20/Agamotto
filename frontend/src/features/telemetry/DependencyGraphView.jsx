@@ -141,16 +141,25 @@ export function DependencyGraphView({ onSelectService }) {
               {edges.map((edge, idx) => {
                 const srcNode = nodes.find((n) => n.id === edge.source) || { x: 180, y: 140 };
                 const tgtNode = nodes.find((n) => n.id === edge.target) || { x: 520, y: 140 };
-                const midX = (srcNode.x + tgtNode.x) / 2;
-                const midY = (srcNode.y + tgtNode.y) / 2;
+                const srcCenter = { x: srcNode.x + 75, y: srcNode.y + 28 };
+                const tgtCenter = { x: tgtNode.x + 75, y: tgtNode.y + 28 };
+                const dx = tgtCenter.x - srcCenter.x;
+                const dy = tgtCenter.y - srcCenter.y;
+                const dist = Math.sqrt(dx * dx + dy * dy) || 1;
+                const x1 = srcCenter.x + (dx / dist) * 65;
+                const y1 = srcCenter.y + (dy / dist) * 24;
+                const x2 = tgtCenter.x - (dx / dist) * 65;
+                const y2 = tgtCenter.y - (dy / dist) * 24;
+                const midX = (x1 + x2) / 2;
+                const midY = (y1 + y2) / 2;
 
                 return (
                   <g key={idx}>
                     <line
-                      x1={srcNode.x + 70}
-                      y1={srcNode.y + 28}
-                      x2={tgtNode.x}
-                      y2={tgtNode.y + 28}
+                      x1={x1}
+                      y1={y1}
+                      x2={x2}
+                      y2={y2}
                       stroke={edge.errorCount > 0 ? 'var(--warn)' : 'var(--border)'}
                       strokeWidth="2"
                       strokeDasharray={edge.errorCount > 0 ? '4 4' : 'none'}
@@ -158,8 +167,8 @@ export function DependencyGraphView({ onSelectService }) {
                     />
                     {/* Latency Pill */}
                     <rect
-                      x={midX - 10}
-                      y={midY + 12}
+                      x={midX - 40}
+                      y={midY - 10}
                       width="80"
                       height="20"
                       rx="10"
@@ -167,8 +176,8 @@ export function DependencyGraphView({ onSelectService }) {
                       stroke="var(--border)"
                     />
                     <text
-                      x={midX + 30}
-                      y={midY + 26}
+                      x={midX}
+                      y={midY + 4}
                       fill="var(--accent)"
                       fontSize="10"
                       fontFamily="var(--font-mono)"

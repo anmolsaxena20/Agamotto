@@ -199,29 +199,36 @@ export const keyService = {
   },
 };
 
+function buildQuery(params = {}) {
+  const clean = {};
+  for (const [key, val] of Object.entries(params)) {
+    if (val !== undefined && val !== null && val !== '' && val !== 'ALL') {
+      clean[key] = val;
+    }
+  }
+  const q = new URLSearchParams(clean).toString();
+  return q ? `?${q}` : '';
+}
+
 export const analyticsService = {
   async getOverview(orgId) {
     return apiRequest(`/orgs/${orgId}/analytics/overview`);
   },
 
   async getLatency(orgId, params = {}) {
-    const query = new URLSearchParams(params).toString();
-    return apiRequest(`/orgs/${orgId}/analytics/latency${query ? `?${query}` : ''}`);
+    return apiRequest(`/orgs/${orgId}/analytics/latency${buildQuery(params)}`);
   },
 
   async getLatencyTimeseries(orgId, params = {}) {
-    const query = new URLSearchParams(params).toString();
-    return apiRequest(`/orgs/${orgId}/analytics/latency/timeseries${query ? `?${query}` : ''}`);
+    return apiRequest(`/orgs/${orgId}/analytics/latency/timeseries${buildQuery(params)}`);
   },
 
   async getThroughput(orgId, params = {}) {
-    const query = new URLSearchParams(params).toString();
-    return apiRequest(`/orgs/${orgId}/analytics/throughput${query ? `?${query}` : ''}`);
+    return apiRequest(`/orgs/${orgId}/analytics/throughput${buildQuery(params)}`);
   },
 
   async getEndpoints(orgId, params = {}) {
-    const query = new URLSearchParams(params).toString();
-    return apiRequest(`/orgs/${orgId}/analytics/endpoints${query ? `?${query}` : ''}`);
+    return apiRequest(`/orgs/${orgId}/analytics/endpoints${buildQuery(params)}`);
   },
 
   async getServices(orgId) {
@@ -233,18 +240,15 @@ export const analyticsService = {
   },
 
   async getErrors(orgId, params = {}) {
-    const query = new URLSearchParams(params).toString();
-    return apiRequest(`/orgs/${orgId}/analytics/errors${query ? `?${query}` : ''}`);
+    return apiRequest(`/orgs/${orgId}/analytics/errors${buildQuery(params)}`);
   },
 
   async getLogs(orgId, params = {}) {
-    const query = new URLSearchParams(params).toString();
-    return apiRequest(`/orgs/${orgId}/analytics/logs${query ? `?${query}` : ''}`);
+    return apiRequest(`/orgs/${orgId}/analytics/logs${buildQuery(params)}`);
   },
 
   async getMetrics(orgId, params = {}) {
-    const query = new URLSearchParams(params).toString();
-    return apiRequest(`/orgs/${orgId}/analytics/metrics${query ? `?${query}` : ''}`);
+    return apiRequest(`/orgs/${orgId}/analytics/metrics${buildQuery(params)}`);
   },
 
   async getResourceOverview(orgId) {
@@ -252,13 +256,11 @@ export const analyticsService = {
   },
 
   async getResourceCpu(orgId, params = {}) {
-    const query = new URLSearchParams(params).toString();
-    return apiRequest(`/orgs/${orgId}/analytics/resources/cpu${query ? `?${query}` : ''}`);
+    return apiRequest(`/orgs/${orgId}/analytics/resources/cpu${buildQuery(params)}`);
   },
 
   async getResourceMemory(orgId, params = {}) {
-    const query = new URLSearchParams(params).toString();
-    return apiRequest(`/orgs/${orgId}/analytics/resources/memory${query ? `?${query}` : ''}`);
+    return apiRequest(`/orgs/${orgId}/analytics/resources/memory${buildQuery(params)}`);
   },
 
   async getEmailMetrics(orgId) {
@@ -266,8 +268,7 @@ export const analyticsService = {
   },
 
   async searchTraces(orgId, params = {}) {
-    const query = new URLSearchParams(params).toString();
-    return apiRequest(`/orgs/${orgId}/analytics/traces${query ? `?${query}` : ''}`);
+    return apiRequest(`/orgs/${orgId}/analytics/traces${buildQuery(params)}`);
   },
 
   async getTrace(orgId, traceId) {
@@ -283,27 +284,22 @@ export const analyticsService = {
   },
 
   async getServiceTraces(orgId, serviceName, params = {}) {
-    const query = new URLSearchParams(params).toString();
-    return apiRequest(`/orgs/${orgId}/analytics/services/${serviceName}/traces${query ? `?${query}` : ''}`);
+    return apiRequest(`/orgs/${orgId}/analytics/services/${serviceName}/traces${buildQuery(params)}`);
   },
 
   async getServiceLogs(orgId, serviceName, params = {}) {
-    const query = new URLSearchParams(params).toString();
-    return apiRequest(`/orgs/${orgId}/analytics/services/${serviceName}/logs${query ? `?${query}` : ''}`);
+    return apiRequest(`/orgs/${orgId}/analytics/services/${serviceName}/logs${buildQuery(params)}`);
   },
 
   async getServiceMetrics(orgId, serviceName, params = {}) {
-    const query = new URLSearchParams(params).toString();
-    return apiRequest(`/orgs/${orgId}/analytics/services/${serviceName}/metrics${query ? `?${query}` : ''}`);
+    return apiRequest(`/orgs/${orgId}/analytics/services/${serviceName}/metrics${buildQuery(params)}`);
   },
 
   async getServiceEndpoints(orgId, serviceName, params = {}) {
-    const query = new URLSearchParams(params).toString();
-    return apiRequest(`/orgs/${orgId}/analytics/services/${serviceName}/endpoints${query ? `?${query}` : ''}`);
+    return apiRequest(`/orgs/${orgId}/analytics/services/${serviceName}/endpoints${buildQuery(params)}`);
   },
 
   async getServiceErrors(orgId, serviceName, params = {}) {
-    const query = new URLSearchParams(params).toString();
-    return apiRequest(`/orgs/${orgId}/analytics/services/${serviceName}/errors${query ? `?${query}` : ''}`);
+    return apiRequest(`/orgs/${orgId}/analytics/services/${serviceName}/errors${buildQuery(params)}`);
   },
 };

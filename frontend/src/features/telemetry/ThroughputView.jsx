@@ -17,9 +17,52 @@ export function ThroughputView() {
     setIsLoading(true);
     try {
       const res = await analyticsService.getThroughput(currentOrg.id);
-      setDataPoints(res?.data || []);
-      if (res?.currentRps != null) setCurrentRps(res.currentRps);
-      if (res?.peakRps != null) setPeakRps(res.peakRps);
+      const raw = Array.isArray(res?.data) ? res.data : [];
+
+      // Group & aggregate by minute timestamp across services if multiple
+      const timeMap = new Map();
+      raw.forEach((pt) => {
+        const rawTime = pt.timestamp || pt.time || '';
+        const timeKey = typeof rawTime === 'string' && rawTime.includes(' ')
+          ? rawTime.split('.')[0]
+          : rawTime;
+        const rps = Number(pt.rps || (pt.request_count ? pt.request_count / 60 : 0));
+        const count = Number(pt.request_count || 0);
+
+        if (!timeMap.has(timeKey)) {
+          timeMap.set(timeKey, {
+            time: timeKey,
+            timestamp: timeKey,
+            rps: 0,
+            request_count: 0,
+          });
+        }
+        const entry = timeMap.get(timeKey);
+        entry.rps += rps;
+        entry.request_count += count;
+      });
+
+      const normalized = Array.from(timeMap.values());
+      setDataPoints(normalized);
+
+      // Compute current and peak RPS
+      if (res?.currentRps != null) {
+        setCurrentRps(Number(res.currentRps.toFixed(2)));
+      } else if (normalized.length > 0) {
+        const latest = normalized[normalized.length - 1];
+        setCurrentRps(Number((latest.rps || 0).toFixed(2)));
+      } else {
+        setCurrentRps(0);
+      }
+
+      if (res?.peakRps != null) {
+        setPeakRps(Number(res.peakRps.toFixed(2)));
+      } else if (normalized.length > 0) {
+        const max = Math.max(...normalized.map((d) => d.rps || 0));
+        setPeakRps(Number(max.toFixed(2)));
+      } else {
+        setPeakRps(0);
+      }
     } catch (err) {
       console.warn('Failed to load throughput:', err);
     } finally {
@@ -31,7 +74,7 @@ export function ThroughputView() {
     fetchThroughput();
   }, [currentOrg?.id]);
 
-  const maxRps = Math.max(...dataPoints.map((d) => d.rps || 0), 100);
+  const maxRps = Math.max(...dataPoints.map((d) => d.rps || 0), 1);
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
@@ -92,21 +135,27 @@ export function ThroughputView() {
         ) : (
           <div
             style={{
-              height: '220px',
+              height: '240px',
               display: 'flex',
               alignItems: 'flex-end',
-              gap: '8px',
-              padding: '10px 0',
+              gap: '6px',
+              padding: '10px 0 24px',
+              overflowX: 'auto',
               borderBottom: '1px solid var(--border)',
             }}
           >
             {dataPoints.map((pt, i) => {
-              const barHeight = (pt.rps / maxRps) * 180;
+              const barHeight = (pt.rps / maxRps) * 160;
+              const formattedTime = typeof pt.time === 'string' && pt.time.includes(' ')
+                ? pt.time.split(' ')[1]?.slice(0, 5) || pt.time
+                : (pt.time || 'N/A');
+
               return (
                 <div
                   key={i}
                   style={{
-                    flex: 1,
+                    flex: '0 0 auto',
+                    minWidth: '20px',
                     display: 'flex',
                     flexDirection: 'column',
                     alignItems: 'center',
@@ -116,19 +165,18 @@ export function ThroughputView() {
                   }}
                 >
                   <div
-                    title={`${pt.time}: ${pt.rps} RPS (${pt.spansPerSec || 0} spans/sec)`}
+                    title={`${pt.time}: ${Number(pt.rps).toFixed(2)} RPS (${pt.request_count || 0} reqs/min)`}
                     style={{
-                      width: '100%',
-                      maxWidth: '24px',
+                      width: '16px',
                       height: `${Math.max(6, barHeight)}px`,
                       backgroundColor: 'var(--accent)',
                       borderRadius: '3px 3px 0 0',
-                      boxShadow: '0 0 10px rgba(224, 176, 80, 0.2)',
+                      boxShadow: '0 0 8px rgba(224, 176, 80, 0.25)',
                       transition: 'height 0.2s ease',
                     }}
                   />
-                  <span style={{ fontSize: '9px', color: 'var(--text-dim)', transform: 'rotate(-45deg)' }}>
-                    {pt.time}
+                  <span style={{ fontSize: '9px', color: 'var(--text-dim)', transform: 'rotate(-45deg)', whiteSpace: 'nowrap', marginTop: '4px' }}>
+                    {formattedTime}
                   </span>
                 </div>
               );

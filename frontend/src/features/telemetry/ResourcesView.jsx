@@ -27,49 +27,80 @@ export function ResourcesView() {
 
       const serviceMap = new Map();
 
-      // Process overview gauges
+      // Process overview gauges with attribute awareness
       rawOverview.forEach((item) => {
         const sName = item.service_name || 'unknown';
         if (!serviceMap.has(sName)) {
-          serviceMap.set(sName, { service: sName, cpuPercent: 0, memoryMb: 0, memoryLimitMb: 512 });
+          serviceMap.set(sName, { service: sName, cpuPercent: 0, memoryMb: 0, heapMb: 0, memoryLimitMb: 1024 });
         }
         const record = serviceMap.get(sName);
         const metric = item.metric_name || '';
         const val = Number(item.latest_value || 0);
+        let attrs = {};
+        try {
+          attrs = typeof item.attributes_json === 'string' ? JSON.parse(item.attributes_json) : (item.attributes_json || {});
+        } catch {}
+
+        const memType = attrs['memory.type'] || '';
 
         if (metric.includes('cpu') || metric.includes('eventloop')) {
           record.cpuPercent = Number((val > 1 ? val : val * 100).toFixed(2));
         } else if (metric.includes('memory') || metric.includes('heap')) {
-          // Bytes to MB
           const mb = val > 1000000 ? val / (1024 * 1024) : val;
-          record.memoryMb = Number(mb.toFixed(2));
+          if (memType === 'rss') {
+            record.memoryMb = Number(mb.toFixed(2));
+          } else if (memType === 'heap_used' || metric.includes('heap')) {
+            record.heapMb = Number(mb.toFixed(2));
+            if (!record.memoryMb) record.memoryMb = Number(mb.toFixed(2));
+          } else if (memType === 'system_total' && mb > 0) {
+            record.memoryLimitMb = Math.round(mb);
+          } else if (!record.memoryMb) {
+            record.memoryMb = Number(mb.toFixed(2));
+          }
         }
       });
 
-      // Overlay cpu timeseries averages if available
-      rawCpu.forEach((c) => {
-        const sName = c.service_name || 'unknown';
-        if (!serviceMap.has(sName)) {
-          serviceMap.set(sName, { service: sName, cpuPercent: 0, memoryMb: 0, memoryLimitMb: 512 });
-        }
-        const record = serviceMap.get(sName);
-        const cpuVal = Number(c.avg_cpu_pct || c.max_cpu_pct || 0);
-        record.cpuPercent = Number((cpuVal > 1 ? cpuVal : cpuVal * 100).toFixed(2));
-      });
+      // Overlay latest cpu reading if timeseries is available
+      if (rawCpu.length > 0) {
+        // Group by service and take the latest timestamp
+        const latestCpuByService = new Map();
+        rawCpu.forEach((c) => {
+          const sName = c.service_name || 'unknown';
+          latestCpuByService.set(sName, c);
+        });
+        latestCpuByService.forEach((c, sName) => {
+          if (!serviceMap.has(sName)) {
+            serviceMap.set(sName, { service: sName, cpuPercent: 0, memoryMb: 0, heapMb: 0, memoryLimitMb: 1024 });
+          }
+          const cpuVal = Number(c.avg_cpu_pct || c.max_cpu_pct || 0);
+          serviceMap.get(sName).cpuPercent = Number((cpuVal > 1 ? cpuVal : cpuVal * 100).toFixed(2));
+        });
+      }
 
-      // Overlay memory timeseries averages if available
-      rawMem.forEach((m) => {
-        const sName = m.service_name || 'unknown';
-        if (!serviceMap.has(sName)) {
-          serviceMap.set(sName, { service: sName, cpuPercent: 0, memoryMb: 0, memoryLimitMb: 512 });
-        }
-        const record = serviceMap.get(sName);
-        const bytes = Number(m.avg_bytes || m.max_bytes || 0);
-        const mb = bytes > 1000000 ? bytes / (1024 * 1024) : bytes;
-        record.memoryMb = Number(mb.toFixed(2));
-      });
+      // Overlay latest memory reading if timeseries is available
+      if (rawMem.length > 0) {
+        const latestMemByService = new Map();
+        rawMem.forEach((m) => {
+          const sName = m.service_name || 'unknown';
+          let attrs = {};
+          try {
+            attrs = typeof m.attributes_json === 'string' ? JSON.parse(m.attributes_json) : (m.attributes_json || {});
+          } catch {}
+          if (attrs['memory.type'] === 'rss' || !latestMemByService.has(sName)) {
+            latestMemByService.set(sName, m);
+          }
+        });
+        latestMemByService.forEach((m, sName) => {
+          if (!serviceMap.has(sName)) {
+            serviceMap.set(sName, { service: sName, cpuPercent: 0, memoryMb: 0, heapMb: 0, memoryLimitMb: 1024 });
+          }
+          const bytes = Number(m.avg_bytes || m.max_bytes || 0);
+          const mb = bytes > 1000000 ? bytes / (1024 * 1024) : bytes;
+          if (mb > 0) serviceMap.get(sName).memoryMb = Number(mb.toFixed(2));
+        });
+      }
 
-      // Fallback: If metrics table only had partial rows, populate with active registered services
+      // If metrics table had no active data yet, populate with active registered services with 0 usage (no fake mock data!)
       if (serviceMap.size === 0) {
         const srvRes = await analyticsService.getServices(currentOrg.id).catch(() => ({ data: [] }));
         const list = Array.isArray(srvRes?.data) ? srvRes.data : (srvRes?.services || []);
@@ -77,9 +108,10 @@ export function ResourcesView() {
           const sName = s.service_name || s.name || 'unknown';
           serviceMap.set(sName, {
             service: sName,
-            cpuPercent: 12.45,
-            memoryMb: 142.30,
-            memoryLimitMb: 512,
+            cpuPercent: 0,
+            memoryMb: 0,
+            heapMb: 0,
+            memoryLimitMb: 1024,
           });
         });
       }
