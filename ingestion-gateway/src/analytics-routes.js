@@ -156,7 +156,7 @@ export function createAnalyticsHandler(store) {
       } else if (route === 'resources/memory') {
         const service = url.searchParams.get('service');
         if (service) params.service = service;
-        query = `SELECT service_name, attributes_json, toStartOfMinute(time) AS timestamp, avg(value) AS avg_bytes, max(value) AS max_bytes FROM ${db}.metric_samples WHERE organization_id = {organizationId:UUID} AND time >= {since:DateTime64(3)} AND time <= {until:DateTime64(3)} AND (metric_name = 'process.memory.usage' OR metric_name = 'v8js.memory.heap.used' OR metric_name LIKE '%memory%') ${service ? 'AND service_name = {service:String}' : ''} GROUP BY service_name, attributes_json, timestamp ORDER BY timestamp ASC LIMIT 5000`;
+        query = `SELECT service_name, metric_name, attributes_json, toStartOfMinute(time) AS timestamp, avg(value) AS avg_bytes, max(value) AS max_bytes FROM ${db}.metric_samples WHERE organization_id = {organizationId:UUID} AND time >= {since:DateTime64(3)} AND time <= {until:DateTime64(3)} AND (metric_name = 'process.memory.usage' OR metric_name = 'v8js.memory.heap.used' OR metric_name LIKE '%memory%') ${service ? 'AND service_name = {service:String}' : ''} GROUP BY service_name, metric_name, attributes_json, timestamp ORDER BY timestamp ASC LIMIT 5000`;
       } else if (route === 'email-metrics') {
         query = `SELECT metric_name, attributes_json, sum(value) AS total_count FROM ${db}.metric_samples WHERE organization_id = {organizationId:UUID} AND time >= {since:DateTime64(3)} AND time <= {until:DateTime64(3)} AND metric_name IN ('email.sent.count', 'email.failure.count') GROUP BY metric_name, attributes_json`;
       } else if (route === 'traces') {
