@@ -150,8 +150,8 @@ export function LogsView({ onSelectTrace }) {
                     borderLeft: `3px solid ${sevColor}`,
                   }}
                 >
-                  <span style={{ color: 'var(--text-dim)', flexShrink: 0, fontSize: '11px' }}>
-                    {typeof time === 'string' && time.includes('T') ? new Date(time).toLocaleTimeString() : time}
+                  <span style={{ color: 'var(--text-dim)', flexShrink: 0, fontSize: '11px', fontFamily: 'var(--font-mono)' }}>
+                    {time}
                   </span>
                   <span style={{ color: sevColor, fontWeight: 700, width: '48px', flexShrink: 0 }}>
                     {sev}

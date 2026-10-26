@@ -176,7 +176,13 @@ function DashboardShell() {
               <LogsView onSelectTrace={navigateToTrace} />
             )}
 
-            {tab === 'resources' && <ResourcesView />}
+            {tab === 'resources' && (
+              <ResourcesView
+                onSelectService={navigateToService}
+                onSelectTrace={navigateToTrace}
+                onNavigate={(targetTab) => navigate(`/dashboard/${targetTab}`)}
+              />
+            )}
 
             {tab === 'organizations' && <OrganizationsView />}
 
