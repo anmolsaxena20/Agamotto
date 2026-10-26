@@ -5,7 +5,14 @@ import grpc from '@grpc/grpc-js';
 import protoLoader from '@grpc/proto-loader';
 import { Resend } from 'resend';
 import { generateOtp } from './src/otp.js';
-import { signupTemplate, resetTemplate } from './src/templates.js';
+import {
+  TEMPLATE_IDS,
+  verificationTemplate,
+  passwordResetTemplate,
+  teamInvitationTemplate,
+  signupTemplate,
+  resetTemplate,
+} from './src/templates.js';
 import { context, metrics, trace, SpanKind } from '@opentelemetry/api';
 import { extractGrpcContext, shutdownTelemetry, startTelemetry, logger } from './src/observability/index.js';
 
@@ -40,6 +47,76 @@ const resend = resendApiKey ? new Resend(resendApiKey) : null;
 const fromEmail = process.env.EMAIL_FROM || 'Agamotto <onboarding@resend.dev>';
 const port = process.env.PORT || '5000';
 
+/**
+ * Sends an email using Resend hosted templates with local HTML fallback
+ */
+async function sendWithResend({ to, subject, templateId, variables, fallbackHtml, purpose }) {
+  if (!resend) {
+    log('WARN', 'RESEND_API_KEY not configured; email delivery was simulated', { to, purpose });
+    emailSentCounter.add(1, { template: templateId, skipped: 'true' });
+    return { success: true };
+  }
+
+  // 1. Attempt to send using Resend hosted template
+  try {
+    const templatePayload = {
+      from: fromEmail,
+      to: Array.isArray(to) ? to : [to],
+      subject,
+      template: {
+        id: templateId,
+        variables: variables || {},
+      },
+    };
+
+    const { data, error } = await resend.emails.send(templatePayload);
+
+    if (!error) {
+      log('INFO', `Delivered email using Resend template: ${templateId}`, { to, templateId, emailId: data?.id });
+      emailSentCounter.add(1, { template: templateId, method: 'hosted_template' });
+      return { success: true, id: data?.id };
+    }
+
+    log('WARN', `Resend hosted template delivery returned error: ${error.message}; attempting HTML fallback`, {
+      to,
+      templateId,
+      error: error.message,
+    });
+  } catch (templateErr) {
+    log('WARN', `Exception with Resend hosted template: ${templateErr.message}; falling back to raw HTML`, {
+      to,
+      templateId,
+      error: templateErr.message,
+    });
+  }
+
+  // 2. Fallback to sending rendered HTML
+  try {
+    const htmlPayload = {
+      from: fromEmail,
+      to: Array.isArray(to) ? to : [to],
+      subject,
+      html: fallbackHtml,
+    };
+
+    const { data, error } = await resend.emails.send(htmlPayload);
+
+    if (error) {
+      log('ERROR', `Resend HTML fallback delivery failed: ${error.message}`, { to, templateId, error: error.message });
+      emailFailureCounter.add(1, { reason: 'resend_error' });
+      throw new Error(error.message);
+    }
+
+    log('INFO', `Delivered email using fallback HTML for template: ${templateId}`, { to, templateId, emailId: data?.id });
+    emailSentCounter.add(1, { template: templateId, method: 'fallback_html' });
+    return { success: true, id: data?.id };
+  } catch (err) {
+    log('ERROR', `Resend email delivery threw exception: ${err.message}`, { to, templateId, error: err.message });
+    emailFailureCounter.add(1, { reason: 'exception' });
+    throw err;
+  }
+}
+
 async function sendOtp(call, callback) {
   const { email, type, name } = call.request;
 
@@ -54,45 +131,69 @@ async function sendOtp(call, callback) {
 
   const { otp, hash, expiresAt } = generateOtp();
 
-  const template = type === 'forgot-password' || type === 'reset'
-    ? resetTemplate(name, otp)
-    : signupTemplate(name, otp);
-
-  if (!resend) {
-    log('WARN', 'RESEND_API_KEY not configured; email delivery was skipped', { email, type: type || 'signup' });
-    emailSentCounter.add(1, { template: type || 'signup', skipped: 'true' });
-    return callback(null, {
-      otp_hash: hash,
-      expires_at: expiresAt,
-    });
-  }
+  const isPasswordReset = type === 'forgot-password' || type === 'reset' || type === 'password-reset';
+  const templateConfig = isPasswordReset
+    ? passwordResetTemplate(name, otp)
+    : verificationTemplate(name, otp);
 
   try {
-    const { error } = await resend.emails.send({
-      from: fromEmail,
-      to: [email],
-      subject: template.subject,
-      html: template.html,
+    await sendWithResend({
+      to: email,
+      subject: templateConfig.subject,
+      templateId: templateConfig.templateId,
+      variables: templateConfig.variables,
+      fallbackHtml: templateConfig.html,
+      purpose: isPasswordReset ? 'password-reset' : 'verification',
     });
 
-    if (error) {
-      log('ERROR', `Resend delivery failed: ${error.message}`, { email, type: type || 'signup', error: error.message });
-      emailFailureCounter.add(1, { reason: 'resend_error' });
-      return callback({
-        code: grpc.status.INTERNAL,
-        message: error.message,
-      });
-    }
-
-    log('INFO', 'OTP email delivered successfully', { email, type: type || 'signup' });
-    emailSentCounter.add(1, { template: type || 'signup' });
+    log('INFO', 'OTP email delivered successfully', { email, templateId: templateConfig.templateId });
     return callback(null, {
       otp_hash: hash,
       expires_at: expiresAt,
     });
   } catch (err) {
-    log('ERROR', `SendOtp threw an exception: ${err.message}`, { email, type: type || 'signup', error: err.message });
-    emailFailureCounter.add(1, { reason: 'exception' });
+    return callback({
+      code: grpc.status.INTERNAL,
+      message: err.message,
+    });
+  }
+}
+
+async function sendInvitation(call, callback) {
+  const { email, inviter_name, workspace_name, role_name, invite_url } = call.request;
+
+  if (!email) {
+    log('WARN', 'SendInvitation rejected: email is required');
+    emailFailureCounter.add(1, { reason: 'missing_email' });
+    return callback({
+      code: grpc.status.INVALID_ARGUMENT,
+      message: 'Email is required',
+    });
+  }
+
+  const templateConfig = teamInvitationTemplate({
+    inviterName: inviter_name,
+    workspaceName: workspace_name,
+    roleName: role_name,
+    inviteUrl: invite_url,
+  });
+
+  try {
+    await sendWithResend({
+      to: email,
+      subject: templateConfig.subject,
+      templateId: templateConfig.templateId,
+      variables: templateConfig.variables,
+      fallbackHtml: templateConfig.html,
+      purpose: 'team-invitation',
+    });
+
+    log('INFO', 'Team invitation email delivered successfully', { email, workspace: workspace_name, role: role_name });
+    return callback(null, {
+      success: true,
+      message: `Invitation successfully sent to ${email}`,
+    });
+  } catch (err) {
     return callback({
       code: grpc.status.INTERNAL,
       message: err.message,
@@ -108,6 +209,7 @@ function startServer() {
   const server = new grpc.Server();
   server.addService(emailProto.EmailService.service, {
     SendOtp: (call, callback) => withGrpcSpan(call, 'email.EmailService/SendOtp', callback, wrappedCb => sendOtp(call, wrappedCb)),
+    SendInvitation: (call, callback) => withGrpcSpan(call, 'email.EmailService/SendInvitation', callback, wrappedCb => sendInvitation(call, wrappedCb)),
     HealthCheck: (call, callback) => withGrpcSpan(call, 'email.EmailService/HealthCheck', callback, wrappedCb => healthCheck(call, wrappedCb)),
   });
 
