@@ -13,10 +13,17 @@ import {
   Users,
   Key,
   ChevronRight,
+  Sparkles,
 } from 'lucide-react';
 
 export function Sidebar({ currentTab, onSelectTab }) {
   const navSections = [
+    {
+      title: 'AI & ROOT-CAUSE ANALYSIS',
+      items: [
+        { id: 'anomalies', label: 'AI Anomalies & Root Cause', icon: Sparkles, badge: 'AI' },
+      ],
+    },
     {
       title: 'TELEMETRY & OBSERVABILITY',
       items: [

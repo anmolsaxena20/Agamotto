@@ -25,6 +25,10 @@ import { DependencyGraphView } from './features/telemetry/DependencyGraphView.js
 import { TracesView } from './features/telemetry/TracesView.jsx';
 import { LogsView } from './features/telemetry/LogsView.jsx';
 import { ResourcesView } from './features/telemetry/ResourcesView.jsx';
+import { AiAnomaliesView } from './features/telemetry/AiAnomaliesView.jsx';
+
+// AI Intelligence Components
+import { AiChatDrawer, FloatingAiTrigger } from './components/AiChatDrawer.jsx';
 
 // Organization & RBAC Views
 import { OrganizationsView } from './features/org/OrganizationsView.jsx';
@@ -42,6 +46,15 @@ function DashboardShell() {
   // Deep scoping trace/service cross-navigation state
   const [scopedTraceId, setScopedTraceId] = useState(null);
   const [scopedService, setScopedService] = useState(null);
+
+  // AI Assistant Chat Drawer state
+  const [isAiChatOpen, setIsAiChatOpen] = useState(false);
+  const [aiChatInitialPrompt, setAiChatInitialPrompt] = useState('');
+
+  const openAiChat = (prompt = '') => {
+    setAiChatInitialPrompt(prompt);
+    setIsAiChatOpen(true);
+  };
 
   if (isLoading) {
     return (
@@ -79,6 +92,7 @@ function DashboardShell() {
   }
 
   const VALID_DASHBOARD_TABS = [
+    'anomalies',
     'overview',
     'services',
     'latency',
@@ -120,7 +134,10 @@ function DashboardShell() {
       }}
     >
       {/* Top Application Header */}
-      <AppHeader onNavigate={(targetTab) => navigate(`/dashboard/${targetTab}`)} />
+      <AppHeader
+        onNavigate={(targetTab) => navigate(`/dashboard/${targetTab}`)}
+        onOpenAiChat={openAiChat}
+      />
 
       {/* Main Layout Area */}
       <div style={{ display: 'flex', flex: 1, overflow: 'hidden' }}>
@@ -141,6 +158,14 @@ function DashboardShell() {
           }}
         >
           <ErrorBoundary key={tab}>
+            {tab === 'anomalies' && (
+              <AiAnomaliesView
+                onSelectTrace={navigateToTrace}
+                onSelectService={navigateToService}
+                onOpenAiChat={openAiChat}
+              />
+            )}
+
             {tab === 'overview' && (
               <TelemetryOverviewView
                 onSelectService={navigateToService}
@@ -169,11 +194,17 @@ function DashboardShell() {
             )}
 
             {tab === 'traces' && (
-              <TracesView initialTraceId={scopedTraceId} />
+              <TracesView
+                initialTraceId={scopedTraceId}
+                onOpenAiChat={openAiChat}
+              />
             )}
 
             {tab === 'logs' && (
-              <LogsView onSelectTrace={navigateToTrace} />
+              <LogsView
+                onSelectTrace={navigateToTrace}
+                onSelectService={navigateToService}
+              />
             )}
 
             {tab === 'resources' && (
@@ -192,6 +223,22 @@ function DashboardShell() {
           </ErrorBoundary>
         </main>
       </div>
+
+      {/* Floating AI Agent Trigger (Talisman Launcher) */}
+      <FloatingAiTrigger onClick={() => openAiChat()} />
+
+      {/* Slide-over AI Assistant Chat Drawer */}
+      <AiChatDrawer
+        isOpen={isAiChatOpen}
+        onClose={() => {
+          setIsAiChatOpen(false);
+          setAiChatInitialPrompt('');
+        }}
+        initialPrompt={aiChatInitialPrompt}
+        onSelectTrace={navigateToTrace}
+        onSelectService={navigateToService}
+        onSelectEndpoint={() => navigate('/dashboard/endpoints')}
+      />
     </div>
   );
 }

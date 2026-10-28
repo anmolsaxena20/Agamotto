@@ -5,8 +5,9 @@ import { StatusBadge } from '../../components/StatusBadge.jsx';
 import { analyticsService } from '../../services/apiServices.js';
 import { useOrg } from '../../context/OrgContext.jsx';
 import { Terminal, Search, RefreshCw, Filter, ExternalLink } from 'lucide-react';
+import { SmartSearchBar } from '../../components/SmartSearchBar.jsx';
 
-export function LogsView({ onSelectTrace }) {
+export function LogsView({ onSelectTrace, onSelectService }) {
   const { currentOrg } = useOrg();
   const [logs, setLogs] = useState([]);
   const [severityFilter, setSeverityFilter] = useState('ALL');
@@ -61,6 +62,24 @@ export function LogsView({ onSelectTrace }) {
           Refresh
         </Button>
       </div>
+
+      {/* Natural Language AI Telemetry Search */}
+      <SmartSearchBar
+        domain="logs"
+        placeholder="Query logs with AI... (e.g. 'find all errors in ingestion-gateway' or '500 status code')"
+        onApplyFilter={(parsed) => {
+          if (!parsed) {
+            setSearch('');
+            return;
+          }
+          if (parsed.clauses && parsed.clauses.length > 0) {
+            const clauseVals = parsed.clauses.map((c) => c.value).join(' ');
+            setSearch(clauseVals);
+          } else if (parsed.query) {
+            setSearch(parsed.query);
+          }
+        }}
+      />
 
       {/* Filter and Search Bar */}
       <div style={{ display: 'flex', gap: '12px', flexWrap: 'wrap', alignItems: 'center' }}>
@@ -156,9 +175,23 @@ export function LogsView({ onSelectTrace }) {
                   <span style={{ color: sevColor, fontWeight: 700, width: '48px', flexShrink: 0 }}>
                     {sev}
                   </span>
-                  <span style={{ color: 'var(--accent)', flexShrink: 0, fontSize: '11px' }}>
+                  <button
+                    onClick={() => onSelectService?.(svc)}
+                    title={`Click to inspect microservice: ${svc}`}
+                    style={{
+                      background: 'none',
+                      border: 'none',
+                      color: 'var(--accent)',
+                      flexShrink: 0,
+                      fontSize: '11px',
+                      fontFamily: 'var(--font-mono)',
+                      cursor: onSelectService ? 'pointer' : 'default',
+                      padding: 0,
+                      textDecoration: onSelectService ? 'underline' : 'none',
+                    }}
+                  >
                     [{svc}]
-                  </span>
+                  </button>
                   <span style={{ color: 'var(--text)', flex: 1, wordBreak: 'break-word' }}>
                     {msg}
                   </span>

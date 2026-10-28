@@ -15,9 +15,10 @@ import {
   Check,
   Shield,
   Layers,
+  Sparkles,
 } from 'lucide-react';
 
-export function AppHeader({ onNavigate }) {
+export function AppHeader({ onNavigate, onOpenAiChat }) {
   const { user, logout } = useAuth();
   const { orgs, currentOrg, switchOrg, createOrg } = useOrg();
 
@@ -255,6 +256,36 @@ export function AppHeader({ onNavigate }) {
             <span style={{ width: '6px', height: '6px', borderRadius: '50%', backgroundColor: '#52525B' }} />
             <span>Ingestion Online</span>
           </div>
+
+          {/* AI Assistant Drawer Trigger */}
+          <button
+            onClick={() => onOpenAiChat?.()}
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: '6px',
+              padding: '6px 12px',
+              borderRadius: 'var(--radius)',
+              backgroundColor: 'rgba(224, 176, 80, 0.12)',
+              border: '1px solid rgba(224, 176, 80, 0.4)',
+              color: 'var(--accent)',
+              cursor: 'pointer',
+              fontSize: '12px',
+              fontWeight: 600,
+              transition: 'all 0.15s ease',
+            }}
+            onMouseEnter={(e) => {
+              e.currentTarget.style.backgroundColor = 'rgba(224, 176, 80, 0.22)';
+              e.currentTarget.style.transform = 'translateY(-1px)';
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.backgroundColor = 'rgba(224, 176, 80, 0.12)';
+              e.currentTarget.style.transform = 'none';
+            }}
+          >
+            <Sparkles size={14} />
+            <span>AI Assistant</span>
+          </button>
 
           <div style={{ position: 'relative' }}>
             <button

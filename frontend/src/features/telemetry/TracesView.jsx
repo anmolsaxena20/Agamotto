@@ -17,9 +17,11 @@ import {
   Filter,
   CheckCircle2,
   AlertCircle,
+  Sparkles,
 } from 'lucide-react';
+import { SmartSearchBar } from '../../components/SmartSearchBar.jsx';
 
-export function TracesView({ initialTraceId }) {
+export function TracesView({ initialTraceId, onOpenAiChat }) {
   const { currentOrg } = useOrg();
   const [traces, setTraces] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -81,6 +83,36 @@ export function TracesView({ initialTraceId }) {
           Refresh
         </Button>
       </div>
+
+      {/* Natural Language AI Telemetry Search */}
+      <SmartSearchBar
+        domain="traces"
+        onApplyFilter={(parsed) => {
+          if (!parsed) {
+            fetchTraces();
+            return;
+          }
+          // Filter traces client-side if clauses present
+          const clauses = parsed.clauses || [];
+          if (clauses.length > 0) {
+            setTraces((prev) =>
+              prev.filter((t) => {
+                for (const c of clauses) {
+                  const field = (c.field || c.column || '').toLowerCase();
+                  const val = String(c.value).toLowerCase();
+                  if (field.includes('service') && !String(t.root_service || t.service || '').toLowerCase().includes(val)) {
+                    return false;
+                  }
+                  if (field.includes('duration') && Number(t.duration_ms || t.durationMs || 0) < Number(val)) {
+                    return false;
+                  }
+                }
+                return true;
+              })
+            );
+          }
+        }}
+      />
 
       {/* Traces List Table Card */}
       <Card>
@@ -186,6 +218,26 @@ export function TracesView({ initialTraceId }) {
                 onClick={() => setActiveViewMode('flat')}
               >
                 Flat Span Attributes
+              </Button>
+
+              <Button
+                variant="secondary"
+                size="sm"
+                onClick={() =>
+                  onOpenAiChat?.(
+                    `Analyze distributed trace ${selectedTraceId}. Root service is ${
+                      traceFlow?.rootService || 'unknown'
+                    }, total duration is ${
+                      traceFlow?.totalDurationMs || 'unknown'
+                    }ms. Trace waterfall spans: ${
+                      JSON.stringify(traceFlow?.spans?.slice(0, 5) || [])
+                    }. Identify the exact bottleneck span and why it stalled.`
+                  )
+                }
+                style={{ display: 'flex', alignItems: 'center', gap: '5px', borderColor: 'rgba(224, 176, 80, 0.4)' }}
+              >
+                <Sparkles size={13} style={{ color: 'var(--accent)' }} />
+                <span>Analyze with AI</span>
               </Button>
             </div>
 
