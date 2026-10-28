@@ -345,6 +345,7 @@ export const aiService = {
       const reader = response.body.getReader();
       const decoder = new TextDecoder('utf-8');
       let buffer = '';
+      let currentEvent = 'message';
 
       while (true) {
         const { value, done } = await reader.read();
@@ -358,6 +359,11 @@ export const aiService = {
           const trimmed = line.trim();
           if (!trimmed || trimmed.startsWith(':')) continue;
 
+          if (trimmed.startsWith('event: ')) {
+            currentEvent = trimmed.slice(7).trim();
+            continue;
+          }
+
           if (trimmed.startsWith('data: ')) {
             const rawData = trimmed.slice(6);
             if (rawData === '[DONE]') {
@@ -366,17 +372,35 @@ export const aiService = {
             }
             try {
               const parsed = JSON.parse(rawData);
-              if (parsed.error) {
-                onError?.(new Error(parsed.error));
-              } else if (parsed.tool_call) {
-                onToolCall?.(parsed.tool_call);
+
+              if (currentEvent === 'error' || parsed.error) {
+                onError?.(new Error(parsed.message || parsed.error || 'AI agent error'));
+              } else if (currentEvent === 'tool_start' || currentEvent === 'tool_result' || parsed.tool_call || parsed.tool) {
+                onToolCall?.({
+                  name: parsed.tool || parsed.tool_call?.name || 'telemetry_tool',
+                  arguments: parsed.arguments || parsed.tool_call?.arguments || {},
+                  result: parsed.result_summary || parsed.result || null,
+                });
+              } else if (currentEvent === 'answer' || parsed.summary !== undefined) {
+                let formattedAnswer = parsed.summary || '';
+                if (parsed.hypotheses && Array.isArray(parsed.hypotheses) && parsed.hypotheses.length > 0) {
+                  formattedAnswer += '\n\n**Investigative Hypotheses:**\n' + parsed.hypotheses.map((h) => `- ${h}`).join('\n');
+                }
+                if (parsed.next_steps && Array.isArray(parsed.next_steps) && parsed.next_steps.length > 0) {
+                  formattedAnswer += '\n\n**Recommended Next Steps:**\n' + parsed.next_steps.map((s) => `- ${s}`).join('\n');
+                }
+                onChunk?.(formattedAnswer, parsed);
               } else if (parsed.text !== undefined) {
                 onChunk?.(parsed.text, parsed);
               } else if (parsed.chunk !== undefined) {
                 onChunk?.(parsed.chunk, parsed);
+              } else {
+                // If unknown JSON with message/detail
+                const textFallback = parsed.message || parsed.detail || JSON.stringify(parsed);
+                onChunk?.(textFallback, parsed);
               }
             } catch {
-              // Plain text fallback
+              // Plain text chunk fallback
               onChunk?.(rawData);
             }
           }
