@@ -26,6 +26,7 @@ import { TracesView } from './features/telemetry/TracesView.jsx';
 import { LogsView } from './features/telemetry/LogsView.jsx';
 import { ResourcesView } from './features/telemetry/ResourcesView.jsx';
 import { AiAnomaliesView } from './features/telemetry/AiAnomaliesView.jsx';
+import { AiChatView } from './features/telemetry/AiChatView.jsx';
 
 // AI Intelligence Components
 import { AiChatDrawer, FloatingAiTrigger } from './components/AiChatDrawer.jsx';
@@ -93,6 +94,7 @@ function DashboardShell() {
 
   const VALID_DASHBOARD_TABS = [
     'anomalies',
+    'ai-chat',
     'overview',
     'services',
     'latency',
@@ -163,6 +165,14 @@ function DashboardShell() {
                 onSelectTrace={navigateToTrace}
                 onSelectService={navigateToService}
                 onOpenAiChat={openAiChat}
+              />
+            )}
+
+            {tab === 'ai-chat' && (
+              <AiChatView
+                onSelectTrace={navigateToTrace}
+                onSelectService={navigateToService}
+                onSelectEndpoint={() => navigate('/dashboard/endpoints')}
               />
             )}
 

@@ -14,7 +14,7 @@ from __future__ import annotations
 
 from datetime import datetime
 from typing import Optional, Any, List, Dict
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, model_validator
 
 
 
@@ -130,8 +130,19 @@ class AskContext(BaseModel):
 
 class AskRequest(BaseModel):
     """Request payload for POST /ask."""
-    question: str
+    question: Optional[str] = None
+    query: Optional[str] = None
     context: Optional[AskContext] = None
+
+    @model_validator(mode="before")
+    @classmethod
+    def resolve_question(cls, data: Any):
+        if isinstance(data, dict):
+            q = data.get("question") or data.get("query")
+            if not q:
+                raise ValueError("Field required: 'question' or 'query'")
+            data["question"] = q
+        return data
 
 
 class ValidateEvidenceRequest(BaseModel):

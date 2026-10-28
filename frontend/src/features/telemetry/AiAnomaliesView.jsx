@@ -8,12 +8,10 @@ import {
   ShieldCheck,
   CheckCircle2,
   Clock,
-  ArrowUpRight,
-  Filter,
+  TrendingUp,
   Layers,
   Activity,
   ChevronRight,
-  TrendingUp,
 } from 'lucide-react';
 import { useOrg } from '../../context/OrgContext.jsx';
 import { aiService } from '../../services/apiServices.js';
@@ -171,15 +169,15 @@ export function AiAnomaliesView({ onSelectTrace, onSelectService, onOpenAiChat }
     }
   };
 
-  const filteredAnomalies = anomalies.filter((a) => {
-    if (selectedSeverity !== 'ALL' && a.severity !== selectedSeverity) return false;
-    if (selectedStatus !== 'ALL' && a.status !== selectedStatus) return false;
+  const filteredAnomalies = anomalies.filter((item) => {
+    if (selectedSeverity !== 'ALL' && item.severity !== selectedSeverity) return false;
+    if (selectedStatus !== 'ALL' && item.status !== selectedStatus) return false;
     return true;
   });
 
-  const highSeverityCount = anomalies.filter((a) => a.severity === 'HIGH').length;
+  const highSeverityCount = anomalies.filter((item) => item.severity === 'HIGH').length;
   const uniqueSuspects = new Set(
-    anomalies.flatMap((a) => (a.suspects || []).map((s) => s.service))
+    anomalies.flatMap((item) => (item.suspects || []).map((s) => s.service))
   ).size;
 
   return (
@@ -197,7 +195,7 @@ export function AiAnomaliesView({ onSelectTrace, onSelectService, onOpenAiChat }
         <div>
           <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
             <h1 className="text-page-title" style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-              <span>AI Root-Cause & Anomaly Intelligence</span>
+              <span>Root-Cause Anomalies & Deviations</span>
             </h1>
             <span
               style={{
@@ -208,13 +206,9 @@ export function AiAnomaliesView({ onSelectTrace, onSelectService, onOpenAiChat }
                 border: '1px solid rgba(224, 176, 80, 0.35)',
                 padding: '2px 8px',
                 borderRadius: 'var(--radius-full)',
-                display: 'flex',
-                alignItems: 'center',
-                gap: '4px',
               }}
             >
-              <Sparkles size={12} />
-              <span>GEMINI 2.5 FLASH</span>
+              GEMINI 2.5 FLASH
             </span>
           </div>
           <p style={{ color: 'var(--text-muted)', fontSize: '13px', marginTop: '4px' }}>
@@ -248,71 +242,71 @@ export function AiAnomaliesView({ onSelectTrace, onSelectService, onOpenAiChat }
         </div>
       </div>
 
-      {/* KPI Summary Cards */}
+      {/* KPI Summary Cards: Strict 4-column balanced grid */}
       <div
         style={{
           display: 'grid',
-          gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))',
+          gridTemplateColumns: 'repeat(4, 1fr)',
           gap: '16px',
         }}
       >
-        <Card>
+        <Card style={{ height: '110px', display: 'flex', flexDirection: 'column', justifyContent: 'space-between', padding: '16px 20px' }}>
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-            <span style={{ fontSize: '12px', color: 'var(--text-dim)', fontWeight: 600 }}>
+            <span style={{ fontSize: '11px', color: 'var(--text-dim)', fontWeight: 700, letterSpacing: '0.04em' }}>
               ACTIVE ANOMALIES
             </span>
             <Activity size={16} style={{ color: 'var(--accent)' }} />
           </div>
-          <div style={{ fontSize: '28px', fontWeight: 700, color: 'var(--text)', marginTop: '8px' }}>
+          <div style={{ fontSize: '26px', fontWeight: 700, color: 'var(--text)' }}>
             {anomalies.length}
           </div>
-          <div style={{ fontSize: '11px', color: 'var(--text-muted)', marginTop: '4px' }}>
+          <div style={{ fontSize: '11px', color: 'var(--text-muted)' }}>
             Across all microservices
           </div>
         </Card>
 
-        <Card>
+        <Card style={{ height: '110px', display: 'flex', flexDirection: 'column', justifyContent: 'space-between', padding: '16px 20px' }}>
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-            <span style={{ fontSize: '12px', color: 'var(--text-dim)', fontWeight: 600 }}>
+            <span style={{ fontSize: '11px', color: 'var(--text-dim)', fontWeight: 700, letterSpacing: '0.04em' }}>
               HIGH SEVERITY
             </span>
             <AlertTriangle size={16} style={{ color: 'var(--error)' }} />
           </div>
-          <div style={{ fontSize: '28px', fontWeight: 700, color: 'var(--error)', marginTop: '8px' }}>
+          <div style={{ fontSize: '26px', fontWeight: 700, color: 'var(--error)' }}>
             {highSeverityCount}
           </div>
-          <div style={{ fontSize: '11px', color: 'var(--text-muted)', marginTop: '4px' }}>
+          <div style={{ fontSize: '11px', color: 'var(--text-muted)' }}>
             Require immediate attention
           </div>
         </Card>
 
-        <Card>
+        <Card style={{ height: '110px', display: 'flex', flexDirection: 'column', justifyContent: 'space-between', padding: '16px 20px' }}>
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-            <span style={{ fontSize: '12px', color: 'var(--text-dim)', fontWeight: 600 }}>
+            <span style={{ fontSize: '11px', color: 'var(--text-dim)', fontWeight: 700, letterSpacing: '0.04em' }}>
               SUSPECT SERVICES
             </span>
             <Server size={16} style={{ color: 'var(--warn)' }} />
           </div>
-          <div style={{ fontSize: '28px', fontWeight: 700, color: 'var(--text)', marginTop: '8px' }}>
+          <div style={{ fontSize: '26px', fontWeight: 700, color: 'var(--text)' }}>
             {uniqueSuspects}
           </div>
-          <div style={{ fontSize: '11px', color: 'var(--text-muted)', marginTop: '4px' }}>
+          <div style={{ fontSize: '11px', color: 'var(--text-muted)' }}>
             Identified with high correlation
           </div>
         </Card>
 
-        <Card>
+        <Card style={{ height: '110px', display: 'flex', flexDirection: 'column', justifyContent: 'space-between', padding: '16px 20px' }}>
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-            <span style={{ fontSize: '12px', color: 'var(--text-dim)', fontWeight: 600 }}>
+            <span style={{ fontSize: '11px', color: 'var(--text-dim)', fontWeight: 700, letterSpacing: '0.04em' }}>
               CONFIDENCE SCORE
             </span>
             <ShieldCheck size={16} style={{ color: 'var(--ok)' }} />
           </div>
-          <div style={{ fontSize: '28px', fontWeight: 700, color: 'var(--ok)', marginTop: '8px' }}>
+          <div style={{ fontSize: '26px', fontWeight: 700, color: 'var(--ok)' }}>
             94.2%
           </div>
-          <div style={{ fontSize: '11px', color: 'var(--text-muted)', marginTop: '4px' }}>
-            Cross-verified by telemetry proofs
+          <div style={{ fontSize: '11px', color: 'var(--text-muted)' }}>
+            Corroborated by telemetry proofs
           </div>
         </Card>
       </div>
@@ -321,11 +315,7 @@ export function AiAnomaliesView({ onSelectTrace, onSelectService, onOpenAiChat }
       <SmartSearchBar
         domain="anomalies"
         placeholder="Query anomalies with AI (e.g. 'high severity anomalies in server' or 'memory spikes')"
-        onApplyFilter={(parsed) => {
-          if (parsed?.service) {
-            // Filter by service if parsed
-          }
-        }}
+        onApplyFilter={() => {}}
       />
 
       {/* Filter Tabs */}
@@ -386,7 +376,7 @@ export function AiAnomaliesView({ onSelectTrace, onSelectService, onOpenAiChat }
         </div>
       </div>
 
-      {/* Anomaly Cards List */}
+      {/* Anomaly Cards List: Disciplined structure, fixed padding, clean alignments */}
       <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
         {filteredAnomalies.length === 0 ? (
           <div
@@ -421,16 +411,15 @@ export function AiAnomaliesView({ onSelectTrace, onSelectService, onOpenAiChat }
                     anomaly.severity === 'HIGH' ? 'rgba(229, 83, 75, 0.4)' : 'var(--border)'
                   }`,
                   borderRadius: 'var(--radius)',
-                  padding: '20px',
+                  padding: '20px 24px',
                   boxShadow: 'var(--shadow-card)',
                   display: 'flex',
                   flexDirection: 'column',
-                  gap: '16px',
-                  transition: 'border-color 0.15s ease',
+                  gap: '14px',
                 }}
               >
-                {/* Anomaly Card Top Header */}
-                <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: '16px' }}>
+                {/* Header row: aligned title, severity pill, deviation tag, timestamp */}
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '16px' }}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap' }}>
                     <StatusBadge
                       status={
@@ -443,7 +432,7 @@ export function AiAnomaliesView({ onSelectTrace, onSelectService, onOpenAiChat }
                       label={anomaly.severity}
                     />
 
-                    <span style={{ fontSize: '16px', fontWeight: 700, color: 'var(--text)' }}>
+                    <span style={{ fontSize: '15px', fontWeight: 700, color: 'var(--text)' }}>
                       {anomaly.title}
                     </span>
 
@@ -473,47 +462,42 @@ export function AiAnomaliesView({ onSelectTrace, onSelectService, onOpenAiChat }
                   </div>
                 </div>
 
-                {/* Metric Delta Comparison */}
+                {/* Metric Delta Comparison Grid */}
                 <div
                   style={{
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: '24px',
-                    padding: '10px 14px',
+                    display: 'grid',
+                    gridTemplateColumns: 'repeat(3, 1fr)',
+                    gap: '12px',
+                    padding: '10px 16px',
                     backgroundColor: 'var(--surface-subtle)',
                     borderRadius: 'var(--radius)',
                     border: '1px solid var(--border)',
                     fontSize: '13px',
-                    flexWrap: 'wrap',
                   }}
                 >
                   <div>
-                    <span style={{ color: 'var(--text-dim)', fontSize: '11px', textTransform: 'uppercase' }}>
+                    <span style={{ color: 'var(--text-dim)', fontSize: '11px', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
                       Metric Tracked:
                     </span>
-                    <div style={{ fontFamily: 'var(--font-mono)', fontWeight: 600, color: 'var(--text)' }}>
+                    <div style={{ fontFamily: 'var(--font-mono)', fontWeight: 600, color: 'var(--text)', marginTop: '2px' }}>
                       {anomaly.metric_name}
                     </div>
                   </div>
 
-                  <div style={{ width: '1px', height: '24px', backgroundColor: 'var(--border)' }} />
-
                   <div>
-                    <span style={{ color: 'var(--text-dim)', fontSize: '11px', textTransform: 'uppercase' }}>
-                      Baseline Value:
+                    <span style={{ color: 'var(--text-dim)', fontSize: '11px', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
+                      Baseline Metric:
                     </span>
-                    <div style={{ fontFamily: 'var(--font-mono)', fontWeight: 600, color: 'var(--text-muted)' }}>
+                    <div style={{ fontFamily: 'var(--font-mono)', fontWeight: 600, color: 'var(--text-muted)', marginTop: '2px' }}>
                       {anomaly.baseline_value} ms
                     </div>
                   </div>
 
-                  <div style={{ width: '1px', height: '24px', backgroundColor: 'var(--border)' }} />
-
                   <div>
-                    <span style={{ color: 'var(--text-dim)', fontSize: '11px', textTransform: 'uppercase' }}>
+                    <span style={{ color: 'var(--text-dim)', fontSize: '11px', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
                       Observed Spike:
                     </span>
-                    <div style={{ fontFamily: 'var(--font-mono)', fontWeight: 700, color: 'var(--error)' }}>
+                    <div style={{ fontFamily: 'var(--font-mono)', fontWeight: 700, color: 'var(--error)', marginTop: '2px' }}>
                       {anomaly.observed_value} ms
                     </div>
                   </div>
@@ -534,7 +518,7 @@ export function AiAnomaliesView({ onSelectTrace, onSelectService, onOpenAiChat }
                     <span style={{ fontSize: '11px', fontWeight: 700, color: 'var(--text-dim)', letterSpacing: '0.05em' }}>
                       SUSPECT MICROSERVICES RANKED BY AI:
                     </span>
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '8px' }}>
                       {anomaly.suspects.map((suspect, idx) => (
                         <div
                           key={idx}
@@ -542,30 +526,29 @@ export function AiAnomaliesView({ onSelectTrace, onSelectService, onOpenAiChat }
                             display: 'flex',
                             alignItems: 'center',
                             justifyContent: 'space-between',
-                            padding: '8px 12px',
+                            padding: '10px 14px',
                             backgroundColor: 'var(--surface-input)',
                             border: '1px solid var(--border)',
                             borderRadius: 'var(--radius)',
                             gap: '12px',
                           }}
                         >
-                          <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', overflow: 'hidden' }}>
                             <ClickableBadge
                               type="service"
                               value={suspect.service}
                               onClick={onSelectService}
                               colorScheme={suspect.suspicion_score > 0.8 ? 'error' : 'warn'}
                             />
-                            <span style={{ fontSize: '12px', color: 'var(--text-secondary)' }}>
+                            <span style={{ fontSize: '12px', color: 'var(--text-secondary)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                               {suspect.reason}
                             </span>
                           </div>
 
-                          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexShrink: 0 }}>
-                            <span style={{ fontSize: '11px', color: 'var(--text-dim)' }}>Suspicion:</span>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexShrink: 0 }}>
                             <div
                               style={{
-                                width: '60px',
+                                width: '50px',
                                 height: '6px',
                                 backgroundColor: 'var(--surface-hover)',
                                 borderRadius: '3px',
@@ -601,7 +584,7 @@ export function AiAnomaliesView({ onSelectTrace, onSelectService, onOpenAiChat }
                 {/* Evidence Traces (Clickable) */}
                 {anomaly.evidence_traces && anomaly.evidence_traces.length > 0 && (
                   <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
-                    <span style={{ fontSize: '11px', fontWeight: 700, color: 'var(--text-dim)' }}>
+                    <span style={{ fontSize: '11px', fontWeight: 700, color: 'var(--text-dim)', letterSpacing: '0.04em' }}>
                       GROUND-TRUTH TRACE EVIDENCE:
                     </span>
                     {anomaly.evidence_traces.map((traceId) => (
@@ -673,7 +656,7 @@ export function AiAnomaliesView({ onSelectTrace, onSelectService, onOpenAiChat }
                     alignItems: 'center',
                     justifyContent: 'flex-end',
                     gap: '10px',
-                    paddingTop: '8px',
+                    paddingTop: '6px',
                     borderTop: '1px solid var(--border-subtle)',
                   }}
                 >

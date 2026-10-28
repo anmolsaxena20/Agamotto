@@ -49,10 +49,18 @@ export async function askAssistantStream(req, res, next) {
     const headers = buildHeaders(req, orgId);
     headers['accept'] = 'text/event-stream';
 
+    const payload = { ...(req.body || {}) };
+    if (payload.query && !payload.question) {
+      payload.question = payload.query;
+    }
+    if (payload.question && !payload.query) {
+      payload.query = payload.question;
+    }
+
     const response = await fetch(targetUrl, {
       method: 'POST',
       headers,
-      body: JSON.stringify(req.body || {}),
+      body: JSON.stringify(payload),
       signal: req.signal, // Abort if client disconnects
     });
 
@@ -130,7 +138,14 @@ async function forwardJson(req, res, next, endpointPath, method = 'POST') {
     };
 
     if (method !== 'GET' && method !== 'HEAD') {
-      options.body = JSON.stringify(req.body || {});
+      const payload = { ...(req.body || {}) };
+      if (payload.query && !payload.question) {
+        payload.question = payload.query;
+      }
+      if (payload.question && !payload.query) {
+        payload.query = payload.question;
+      }
+      options.body = JSON.stringify(payload);
     }
 
     const response = await fetch(targetUrl.toString(), options);

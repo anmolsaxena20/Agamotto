@@ -14,20 +14,18 @@ import {
   Key,
   ChevronRight,
   Sparkles,
+  Bot,
+  AlertTriangle,
 } from 'lucide-react';
 
 export function Sidebar({ currentTab, onSelectTab }) {
   const navSections = [
     {
-      title: 'AI & ROOT-CAUSE ANALYSIS',
-      items: [
-        { id: 'anomalies', label: 'AI Anomalies & Root Cause', icon: Sparkles, badge: 'AI' },
-      ],
-    },
-    {
       title: 'TELEMETRY & OBSERVABILITY',
       items: [
         { id: 'overview', label: 'Global Overview', icon: Activity },
+        { id: 'anomalies', label: 'Root-Cause Anomalies', icon: AlertTriangle },
+        { id: 'ai-chat', label: 'AI Diagnostic Agent', icon: Bot },
         { id: 'services', label: 'Microservices', icon: Server },
         { id: 'latency', label: 'Latency Percentiles', icon: Clock },
         { id: 'throughput', label: 'Throughput & RPS', icon: Zap },
