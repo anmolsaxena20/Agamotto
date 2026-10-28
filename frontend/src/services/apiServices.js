@@ -1,4 +1,4 @@
-import { apiRequest, setAccessToken, clearAccessToken, broadcastLogout, broadcastLogin } from './apiClient.js';
+import { apiRequest, setAccessToken, getAccessToken, clearAccessToken, broadcastLogout, broadcastLogin } from './apiClient.js';
 
 export const authService = {
   async signup({ email, password, name }) {
@@ -301,5 +301,140 @@ export const analyticsService = {
 
   async getServiceErrors(orgId, serviceName, params = {}) {
     return apiRequest(`/orgs/${orgId}/analytics/services/${serviceName}/errors${buildQuery(params)}`);
+  },
+};
+
+const API_BASE_URL = import.meta.env.VITE_API_BACKEND_URL || import.meta.env.VITE_API_BASE_URL || '';
+
+export const aiService = {
+  /**
+   * Stream AI agent responses using Server-Sent Events (SSE)
+   */
+  async askAssistantStream(orgId, { query, conversationId, onChunk, onToolCall, onDone, onError, signal }) {
+    const token = getAccessToken();
+    const headers = {
+      'Content-Type': 'application/json',
+      'Accept': 'text/event-stream',
+    };
+    if (token) {
+      headers['Authorization'] = `Bearer ${token}`;
+    }
+
+    try {
+      const response = await fetch(`${API_BASE_URL}/orgs/${orgId}/ai/ask`, {
+        method: 'POST',
+        headers,
+        body: JSON.stringify({
+          query,
+          conversation_id: conversationId,
+        }),
+        signal,
+      });
+
+      if (!response.ok) {
+        let errMessage = `HTTP ${response.status}`;
+        try {
+          const errData = await response.json();
+          errMessage = errData.message || errData.detail || errMessage;
+        } catch (_) {}
+        throw new Error(errMessage);
+      }
+
+      const reader = response.body.getReader();
+      const decoder = new TextDecoder('utf-8');
+      let buffer = '';
+
+      while (true) {
+        const { value, done } = await reader.read();
+        if (done) break;
+
+        buffer += decoder.decode(value, { stream: true });
+        const lines = buffer.split('\n');
+        buffer = lines.pop() || '';
+
+        for (const line of lines) {
+          const trimmed = line.trim();
+          if (!trimmed || trimmed.startsWith(':')) continue;
+
+          if (trimmed.startsWith('data: ')) {
+            const rawData = trimmed.slice(6);
+            if (rawData === '[DONE]') {
+              onDone?.();
+              return;
+            }
+            try {
+              const parsed = JSON.parse(rawData);
+              if (parsed.error) {
+                onError?.(new Error(parsed.error));
+              } else if (parsed.tool_call) {
+                onToolCall?.(parsed.tool_call);
+              } else if (parsed.text !== undefined) {
+                onChunk?.(parsed.text, parsed);
+              } else if (parsed.chunk !== undefined) {
+                onChunk?.(parsed.chunk, parsed);
+              }
+            } catch {
+              // Plain text fallback
+              onChunk?.(rawData);
+            }
+          }
+        }
+      }
+
+      onDone?.();
+    } catch (err) {
+      if (err.name === 'AbortError') return;
+      onError?.(err);
+    }
+  },
+
+  async askAssistantSync(orgId, { query, conversationId }) {
+    return apiRequest(`/orgs/${orgId}/ai/ask/sync`, {
+      method: 'POST',
+      body: JSON.stringify({ query, conversation_id: conversationId }),
+    });
+  },
+
+  async parseFilter(orgId, { query, domain = 'traces' }) {
+    return apiRequest(`/orgs/${orgId}/ai/parse-filter`, {
+      method: 'POST',
+      body: JSON.stringify({ query, domain }),
+    });
+  },
+
+  async executeFilter(orgId, { filter, domain = 'traces', limit = 50 }) {
+    return apiRequest(`/orgs/${orgId}/ai/filter`, {
+      method: 'POST',
+      body: JSON.stringify({ filter, domain, limit }),
+    });
+  },
+
+  async getAnomalies(orgId, params = {}) {
+    return apiRequest(`/orgs/${orgId}/ai/anomalies${buildQuery(params)}`);
+  },
+
+  async validateEvidence(orgId, { claims, timeRange }) {
+    return apiRequest(`/orgs/${orgId}/ai/evidence/validate`, {
+      method: 'POST',
+      body: JSON.stringify({ claims, time_range: timeRange }),
+    });
+  },
+
+  async checkEvidenceItem(orgId, { claimType, parameters }) {
+    return apiRequest(`/orgs/${orgId}/ai/evidence/check`, {
+      method: 'POST',
+      body: JSON.stringify({ claim_type: claimType, parameters }),
+    });
+  },
+
+  async listMcpTools(orgId) {
+    return apiRequest(`/orgs/${orgId}/ai/mcp/tools`);
+  },
+
+  async toggleMcpTool(orgId, name, enabled = true) {
+    return apiRequest(`/orgs/${orgId}/ai/mcp/tools/${name}/toggle`, {
+      method: 'POST',
+      body: JSON.stringify({ enabled }),
+    });
   },
 };
