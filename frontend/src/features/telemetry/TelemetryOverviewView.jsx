@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Card } from '../../components/Card.jsx';
 import { StatusBadge } from '../../components/StatusBadge.jsx';
 import { Button } from '../../components/Button.jsx';
+import { ClickableBadge } from '../../components/ClickableEvidence.jsx';
 import { analyticsService } from '../../services/apiServices.js';
 import { useOrg } from '../../context/OrgContext.jsx';
 import { formatLatency, formatLatencyNum, formatPercent } from '../../utils/formatters.js';
@@ -406,19 +407,12 @@ export function TelemetryOverviewView({ onSelectService, onSelectTrace, onNaviga
                           <span style={{ fontWeight: 600, color: 'var(--text)', fontSize: '13px' }}>
                             {endpoint}
                           </span>
-                          <span
-                            style={{
-                              fontSize: '11px',
-                              padding: '1px 6px',
-                              borderRadius: 'var(--radius-sm)',
-                              backgroundColor: 'var(--surface)',
-                              border: '1px solid var(--border)',
-                              fontFamily: 'var(--font-mono)',
-                              color: 'var(--text-secondary)',
-                            }}
-                          >
-                            {service}
-                          </span>
+                          <ClickableBadge
+                            type="service"
+                            value={service}
+                            onClick={(svc) => (onSelectService ? onSelectService(svc) : onNavigate?.('services'))}
+                            colorScheme="neutral"
+                          />
                         </div>
                         <div style={{ fontSize: '12px', color: 'var(--text-muted)', marginTop: '2px' }}>
                           p99 duration: {formatLatency(err.p99_ms)}

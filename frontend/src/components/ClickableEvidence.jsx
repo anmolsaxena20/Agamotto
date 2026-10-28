@@ -1,5 +1,5 @@
-import React from 'react';
-import { GitBranch, Server, Network, Terminal, ExternalLink, ShieldCheck } from 'lucide-react';
+import React, { useState } from 'react';
+import { GitBranch, Server, Network, Terminal, ExternalLink, ShieldCheck, Copy, Check } from 'lucide-react';
 
 const KNOWN_SERVICES = [
   'server',
@@ -240,51 +240,101 @@ export function ClickableBadge({
   onClick,
   icon: CustomIcon,
   colorScheme = 'accent',
+  copyable = false,
 }) {
+  const [copied, setCopied] = useState(false);
   const Icon = CustomIcon || (type === 'trace' ? GitBranch : type === 'service' ? Server : Network);
   const colors = BADGE_COLOR_MAP[colorScheme] || BADGE_COLOR_MAP.accent;
 
+  const handleCopy = (e) => {
+    e.stopPropagation();
+    if (value) {
+      navigator.clipboard.writeText(value);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 1500);
+    }
+  };
+
   return (
-    <button
-      onClick={(e) => {
-        e.stopPropagation();
-        onClick?.(value);
-      }}
-      title={`Click to inspect ${type}: ${value}`}
+    <span
       style={{
         display: 'inline-flex',
         alignItems: 'center',
-        gap: '6px',
-        backgroundColor: colors.bg,
-        border: `1px solid ${colors.border}`,
-        color: colors.text,
-        borderRadius: 'var(--radius)',
-        padding: '3px 8px',
-        fontSize: '12px',
-        fontWeight: 600,
-        fontFamily: type === 'trace' ? 'var(--font-mono)' : 'var(--font-sans)',
-        cursor: onClick ? 'pointer' : 'default',
-        transition: 'all 0.15s ease',
-        userSelect: 'none',
-      }}
-      onMouseEnter={(e) => {
-        if (onClick) {
-          e.currentTarget.style.backgroundColor = colors.hoverBg;
-          e.currentTarget.style.transform = 'translateY(-1px)';
-          e.currentTarget.style.boxShadow = '0 2px 8px rgba(0,0,0,0.2)';
-        }
-      }}
-      onMouseLeave={(e) => {
-        if (onClick) {
-          e.currentTarget.style.backgroundColor = colors.bg;
-          e.currentTarget.style.transform = 'none';
-          e.currentTarget.style.boxShadow = 'none';
-        }
+        gap: '2px',
+        margin: '0 2px',
       }}
     >
-      <Icon size={13} style={{ flexShrink: 0 }} />
-      <span>{label || value}</span>
-      {onClick && <ExternalLink size={10} style={{ opacity: 0.6 }} />}
-    </button>
+      <button
+        onClick={(e) => {
+          e.stopPropagation();
+          onClick?.(value);
+        }}
+        title={`Click to inspect ${type}: ${value}`}
+        style={{
+          display: 'inline-flex',
+          alignItems: 'center',
+          gap: '5px',
+          backgroundColor: colors.bg,
+          border: `1px solid ${colors.border}`,
+          color: colors.text,
+          borderRadius: copyable || type === 'trace' ? 'var(--radius-sm) 0 0 var(--radius-sm)' : 'var(--radius-sm)',
+          padding: '2px 7px',
+          fontSize: '11px',
+          fontWeight: 600,
+          fontFamily: type === 'trace' ? 'var(--font-mono)' : 'var(--font-sans)',
+          cursor: onClick ? 'pointer' : 'default',
+          transition: 'all 0.15s ease',
+          userSelect: 'none',
+          lineHeight: '16px',
+        }}
+        onMouseEnter={(e) => {
+          if (onClick) {
+            e.currentTarget.style.backgroundColor = colors.hoverBg;
+            e.currentTarget.style.transform = 'translateY(-1px)';
+            e.currentTarget.style.boxShadow = '0 2px 8px rgba(0,0,0,0.2)';
+          }
+        }}
+        onMouseLeave={(e) => {
+          if (onClick) {
+            e.currentTarget.style.backgroundColor = colors.bg;
+            e.currentTarget.style.transform = 'none';
+            e.currentTarget.style.boxShadow = 'none';
+          }
+        }}
+      >
+        <Icon size={12} style={{ flexShrink: 0 }} />
+        <span>{label || value}</span>
+        {onClick && <ExternalLink size={9} style={{ opacity: 0.6 }} />}
+      </button>
+
+      {(copyable || type === 'trace') && (
+        <button
+          onClick={handleCopy}
+          title={copied ? 'Copied to clipboard!' : `Copy ${value}`}
+          style={{
+            display: 'inline-flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            padding: '2px 5px',
+            backgroundColor: colors.bg,
+            border: `1px solid ${colors.border}`,
+            borderLeft: 'none',
+            borderRadius: '0 var(--radius-sm) var(--radius-sm) 0',
+            color: copied ? 'var(--ok)' : colors.text,
+            cursor: 'pointer',
+            transition: 'all 0.15s ease',
+            lineHeight: '16px',
+          }}
+          onMouseEnter={(e) => {
+            e.currentTarget.style.backgroundColor = colors.hoverBg;
+          }}
+          onMouseLeave={(e) => {
+            e.currentTarget.style.backgroundColor = colors.bg;
+          }}
+        >
+          {copied ? <Check size={11} /> : <Copy size={11} style={{ opacity: 0.7 }} />}
+        </button>
+      )}
+    </span>
   );
 }

@@ -6,30 +6,61 @@ export function Card({
   style = {},
   onClick,
   hoverable = false,
+  title,
+  subtitle,
+  action,
+  headerBorder = true,
+  bodyPadding = 'var(--space-4)',
   ...props
 }) {
-  const [isHovered, setIsHovered] = React.useState(false);
+  const isInteractive = hoverable || Boolean(onClick);
+  const cardClasses = [
+    'pro-card',
+    isInteractive ? 'pro-card-interactive' : '',
+    className,
+  ].filter(Boolean).join(' ');
 
   return (
     <div
       onClick={onClick}
-      onMouseEnter={() => hoverable && setIsHovered(true)}
-      onMouseLeave={() => hoverable && setIsHovered(false)}
+      className={cardClasses}
       style={{
-        backgroundColor: 'var(--surface)',
-        border: `1px solid ${isHovered ? 'var(--border-focus)' : 'var(--border)'}`,
-        borderRadius: 'var(--radius)',
-        padding: 'var(--space-4)',
-        boxShadow: 'none',
-        transition: 'border-color 0.15s ease, transform 0.15s ease',
-        cursor: onClick ? 'pointer' : 'default',
-        transform: isHovered ? 'translateY(-1px)' : 'none',
+        display: 'flex',
+        flexDirection: 'column',
         ...style,
       }}
-      className={className}
       {...props}
     >
-      {children}
+      {(title || action) && (
+        <div
+          className="pro-card-header"
+          style={{
+            borderBottom: headerBorder ? '1px solid var(--border-subtle)' : 'none',
+          }}
+        >
+          <div>
+            {title && (
+              <h3 style={{ fontSize: '15px', fontWeight: 600, color: 'var(--text)', margin: 0 }}>
+                {title}
+              </h3>
+            )}
+            {subtitle && (
+              <p style={{ fontSize: '12px', color: 'var(--text-muted)', margin: '2px 0 0 0' }}>
+                {subtitle}
+              </p>
+            )}
+          </div>
+          {action && <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>{action}</div>}
+        </div>
+      )}
+      <div
+        style={{
+          padding: (title || action) ? (bodyPadding || '16px') : (bodyPadding || 'var(--space-4)'),
+          flex: 1,
+        }}
+      >
+        {children}
+      </div>
     </div>
   );
 }
