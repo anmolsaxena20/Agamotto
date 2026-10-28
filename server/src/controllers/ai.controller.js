@@ -33,6 +33,8 @@ function buildHeaders(req, orgId) {
   return headers;
 }
 
+const tracer = trace.getTracer('server.ai');
+
 /**
  * Streaming Server-Sent Events (SSE) Proxy for AI Chat Assistant
  * POST /api/orgs/:orgId/ai/ask
@@ -45,70 +47,93 @@ export async function askAssistantStream(req, res, next) {
   const { baseUrl } = getAiServiceConfig();
   const targetUrl = `${baseUrl.replace(/\/$/, '')}/ask`;
 
-  try {
-    const headers = buildHeaders(req, orgId);
-    headers['accept'] = 'text/event-stream';
+  return tracer.startActiveSpan(
+    'HTTP POST /ask -> ai-service',
+    {
+      kind: trace.SpanKind.CLIENT,
+      attributes: {
+        'peer.service': 'ai-service',
+        'http.url': targetUrl,
+        'http.method': 'POST',
+        'organization.id': orgId,
+      },
+    },
+    async (span) => {
+      try {
+        const headers = buildHeaders(req, orgId);
+        headers['accept'] = 'text/event-stream';
 
-    const payload = { ...(req.body || {}) };
-    if (payload.query && !payload.question) {
-      payload.question = payload.query;
+        const payload = { ...(req.body || {}) };
+        if (payload.query && !payload.question) {
+          payload.question = payload.query;
+        }
+        if (payload.question && !payload.query) {
+          payload.query = payload.question;
+        }
+
+        const response = await fetch(targetUrl, {
+          method: 'POST',
+          headers,
+          body: JSON.stringify(payload),
+          signal: req.signal,
+        });
+
+        if (!response.ok) {
+          const errorText = await response.text();
+          const elapsed = performance.now() - started;
+          aiProxyCounter.add(1, { endpoint: 'ask_stream', status_code: response.status });
+          aiProxyDuration.record(elapsed, { endpoint: 'ask_stream', status_code: response.status });
+          span.setAttribute('http.status_code', response.status);
+          span.setStatus({ code: 2, message: `AI service returned HTTP ${response.status}` });
+          return res.status(response.status).json({
+            error: `AI service returned error ${response.status}: ${errorText}`,
+          });
+        }
+
+        span.setAttribute('http.status_code', 200);
+        span.setStatus({ code: 1 });
+
+        // Set SSE Headers
+        res.setHeader('Content-Type', 'text/event-stream');
+        res.setHeader('Cache-Control', 'no-cache, no-transform');
+        res.setHeader('Connection', 'keep-alive');
+        res.setHeader('X-Accel-Buffering', 'no');
+        res.flushHeaders?.();
+
+        const reader = response.body.getReader();
+        const decoder = new TextDecoder();
+
+        while (true) {
+          const { done, value } = await reader.read();
+          if (done) break;
+          const chunk = decoder.decode(value, { stream: true });
+          res.write(chunk);
+        }
+
+        const elapsed = performance.now() - started;
+        aiProxyCounter.add(1, { endpoint: 'ask_stream', status_code: 200 });
+        aiProxyDuration.record(elapsed, { endpoint: 'ask_stream', status_code: 200 });
+        res.end();
+      } catch (error) {
+        span.recordException(error);
+        span.setStatus({ code: 2, message: error.message });
+        if (req.aborted) {
+          log('INFO', 'AI SSE client aborted connection');
+          return;
+        }
+        const elapsed = performance.now() - started;
+        aiProxyCounter.add(1, { endpoint: 'ask_stream', status_code: 500 });
+        aiProxyDuration.record(elapsed, { endpoint: 'ask_stream', status_code: 500 });
+        log('ERROR', `AI SSE streaming failed: ${error.message}`);
+        if (!res.headersSent) {
+          return res.status(500).json({ error: error.message });
+        }
+        res.end();
+      } finally {
+        span.end();
+      }
     }
-    if (payload.question && !payload.query) {
-      payload.query = payload.question;
-    }
-
-    const response = await fetch(targetUrl, {
-      method: 'POST',
-      headers,
-      body: JSON.stringify(payload),
-      signal: req.signal, // Abort if client disconnects
-    });
-
-    if (!response.ok) {
-      const errorText = await response.text();
-      const elapsed = performance.now() - started;
-      aiProxyCounter.add(1, { endpoint: 'ask_stream', status_code: response.status });
-      aiProxyDuration.record(elapsed, { endpoint: 'ask_stream', status_code: response.status });
-      return res.status(response.status).json({
-        error: `AI service returned error ${response.status}: ${errorText}`,
-      });
-    }
-
-    // Set SSE Headers
-    res.setHeader('Content-Type', 'text/event-stream');
-    res.setHeader('Cache-Control', 'no-cache, no-transform');
-    res.setHeader('Connection', 'keep-alive');
-    res.setHeader('X-Accel-Buffering', 'no'); // Disable proxy buffering for nginx
-    res.flushHeaders?.();
-
-    const reader = response.body.getReader();
-    const decoder = new TextDecoder();
-
-    while (true) {
-      const { done, value } = await reader.read();
-      if (done) break;
-      const chunk = decoder.decode(value, { stream: true });
-      res.write(chunk);
-    }
-
-    const elapsed = performance.now() - started;
-    aiProxyCounter.add(1, { endpoint: 'ask_stream', status_code: 200 });
-    aiProxyDuration.record(elapsed, { endpoint: 'ask_stream', status_code: 200 });
-    res.end();
-  } catch (error) {
-    if (req.aborted) {
-      log('INFO', 'AI SSE client aborted connection');
-      return;
-    }
-    const elapsed = performance.now() - started;
-    aiProxyCounter.add(1, { endpoint: 'ask_stream', status_code: 500 });
-    aiProxyDuration.record(elapsed, { endpoint: 'ask_stream', status_code: 500 });
-    log('ERROR', `AI SSE streaming failed: ${error.message}`);
-    if (!res.headersSent) {
-      return res.status(500).json({ error: error.message });
-    }
-    res.end();
-  }
+  );
 }
 
 /**
@@ -129,45 +154,70 @@ async function forwardJson(req, res, next, endpointPath, method = 'POST') {
     }
   }
 
-  try {
-    const headers = buildHeaders(req, orgId);
-    const options = {
-      method,
-      headers,
-      signal: AbortSignal.timeout(60000), // 60s timeout for analytical / AI calls
-    };
+  return tracer.startActiveSpan(
+    `HTTP ${method} /${endpointPath} -> ai-service`,
+    {
+      kind: trace.SpanKind.CLIENT,
+      attributes: {
+        'peer.service': 'ai-service',
+        'http.url': targetUrl.toString(),
+        'http.method': method,
+        'organization.id': orgId,
+      },
+    },
+    async (span) => {
+      try {
+        const headers = buildHeaders(req, orgId);
+        const options = {
+          method,
+          headers,
+          signal: AbortSignal.timeout(60000),
+        };
 
-    if (method !== 'GET' && method !== 'HEAD') {
-      const payload = { ...(req.body || {}) };
-      if (payload.query && !payload.question) {
-        payload.question = payload.query;
+        if (method !== 'GET' && method !== 'HEAD') {
+          const payload = { ...(req.body || {}) };
+          if (payload.query && !payload.question) {
+            payload.question = payload.query;
+          }
+          if (payload.question && !payload.query) {
+            payload.query = payload.question;
+          }
+          options.body = JSON.stringify(payload);
+        }
+
+        const response = await fetch(targetUrl.toString(), options);
+        const elapsed = performance.now() - started;
+        aiProxyCounter.add(1, { endpoint: endpointPath, status_code: response.status });
+        aiProxyDuration.record(elapsed, { endpoint: endpointPath, status_code: response.status });
+        span.setAttribute('http.status_code', response.status);
+
+        if (!response.ok) {
+          span.setStatus({ code: 2, message: `HTTP ${response.status}` });
+        } else {
+          span.setStatus({ code: 1 });
+        }
+
+        const contentType = response.headers.get('content-type') || '';
+        if (contentType.includes('application/json')) {
+          const data = await response.json();
+          return res.status(response.status).json(data);
+        }
+
+        const text = await response.text();
+        return res.status(response.status).send(text);
+      } catch (error) {
+        span.recordException(error);
+        span.setStatus({ code: 2, message: error.message });
+        const elapsed = performance.now() - started;
+        aiProxyCounter.add(1, { endpoint: endpointPath, status_code: 500 });
+        aiProxyDuration.record(elapsed, { endpoint: endpointPath, status_code: 500 });
+        log('ERROR', `AI Proxy request to ${endpointPath} failed: ${error.message}`);
+        return res.status(502).json({ error: `AI service unavailable: ${error.message}` });
+      } finally {
+        span.end();
       }
-      if (payload.question && !payload.query) {
-        payload.query = payload.question;
-      }
-      options.body = JSON.stringify(payload);
     }
-
-    const response = await fetch(targetUrl.toString(), options);
-    const elapsed = performance.now() - started;
-    aiProxyCounter.add(1, { endpoint: endpointPath, status_code: response.status });
-    aiProxyDuration.record(elapsed, { endpoint: endpointPath, status_code: response.status });
-
-    const contentType = response.headers.get('content-type') || '';
-    if (contentType.includes('application/json')) {
-      const data = await response.json();
-      return res.status(response.status).json(data);
-    }
-
-    const text = await response.text();
-    return res.status(response.status).send(text);
-  } catch (error) {
-    const elapsed = performance.now() - started;
-    aiProxyCounter.add(1, { endpoint: endpointPath, status_code: 500 });
-    aiProxyDuration.record(elapsed, { endpoint: endpointPath, status_code: 500 });
-    log('ERROR', `AI Proxy request to ${endpointPath} failed: ${error.message}`);
-    return res.status(502).json({ error: `AI service unavailable: ${error.message}` });
-  }
+  );
 }
 
 export const askAssistantSync = (req, res, next) => forwardJson(req, res, next, 'ask/sync', 'POST');
