@@ -206,6 +206,33 @@ export function ClickableEvidence({ text, onSelectTrace, onSelectService, onSele
  * ClickableBadge
  * Standalone interactive chip with hover micro-animations
  */
+const BADGE_COLOR_MAP = {
+  accent: {
+    bg: 'rgba(224, 176, 80, 0.12)',
+    border: 'rgba(224, 176, 80, 0.35)',
+    text: 'var(--accent)',
+    hoverBg: 'rgba(224, 176, 80, 0.24)',
+  },
+  ok: {
+    bg: 'rgba(63, 182, 139, 0.12)',
+    border: 'rgba(63, 182, 139, 0.35)',
+    text: 'var(--ok)',
+    hoverBg: 'rgba(63, 182, 139, 0.24)',
+  },
+  error: {
+    bg: 'rgba(229, 83, 75, 0.12)',
+    border: 'rgba(229, 83, 75, 0.35)',
+    text: 'var(--error)',
+    hoverBg: 'rgba(229, 83, 75, 0.24)',
+  },
+  neutral: {
+    bg: 'var(--surface-hover)',
+    border: 'var(--border)',
+    text: 'var(--text)',
+    hoverBg: 'var(--surface-active)',
+  },
+};
+
 export function ClickableBadge({
   type = 'trace',
   value,
@@ -215,33 +242,7 @@ export function ClickableBadge({
   colorScheme = 'accent',
 }) {
   const Icon = CustomIcon || (type === 'trace' ? GitBranch : type === 'service' ? Server : Network);
-
-  const colors = {
-    accent: {
-      bg: 'rgba(224, 176, 80, 0.12)',
-      border: 'rgba(224, 176, 80, 0.35)',
-      text: 'var(--accent)',
-      hoverBg: 'rgba(224, 176, 80, 0.24)',
-    },
-    ok: {
-      bg: 'rgba(63, 182, 139, 0.12)',
-      border: 'rgba(63, 182, 139, 0.35)',
-      text: 'var(--ok)',
-      hoverBg: 'rgba(63, 182, 139, 0.24)',
-    },
-    error: {
-      bg: 'rgba(229, 83, 75, 0.12)',
-      border: 'rgba(229, 83, 75, 0.35)',
-      text: 'var(--error)',
-      hoverBg: 'rgba(229, 83, 75, 0.24)',
-    },
-    neutral: {
-      bg: 'var(--surface-hover)',
-      border: 'var(--border)',
-      text: 'var(--text)',
-      hoverBg: 'var(--surface-active)',
-    },
-  }[colorScheme] || colors.accent;
+  const colors = BADGE_COLOR_MAP[colorScheme] || BADGE_COLOR_MAP.accent;
 
   return (
     <button

@@ -321,11 +321,13 @@ export const aiService = {
     }
 
     try {
+      const qText = query || '';
       const response = await fetch(`${API_BASE_URL}/orgs/${orgId}/ai/ask`, {
         method: 'POST',
         headers,
         body: JSON.stringify({
-          query,
+          question: qText,
+          query: qText,
           conversation_id: conversationId,
         }),
         signal,
@@ -389,9 +391,14 @@ export const aiService = {
   },
 
   async askAssistantSync(orgId, { query, conversationId }) {
+    const qText = query || '';
     return apiRequest(`/orgs/${orgId}/ai/ask/sync`, {
       method: 'POST',
-      body: JSON.stringify({ query, conversation_id: conversationId }),
+      body: JSON.stringify({
+        question: qText,
+        query: qText,
+        conversation_id: conversationId,
+      }),
     });
   },
 
