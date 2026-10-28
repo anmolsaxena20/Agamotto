@@ -135,7 +135,7 @@ export function AuthSuccessView({ user, organization, onLogout }) {
               variant="primary"
               size="default"
               icon={ArrowRight}
-              onClick={() => alert('Ready to route to /setup or /overview once created!')}
+              onClick={() => navigate('/dashboard/keys')}
             >
               Open Setup & Ingest Keys
             </Button>
@@ -143,9 +143,9 @@ export function AuthSuccessView({ user, organization, onLogout }) {
               variant="secondary"
               size="default"
               icon={Terminal}
-              onClick={() => alert('Starting live OpenTelemetry mock stream...')}
+              onClick={() => navigate('/dashboard/overview')}
             >
-              Start Demo Stream
+              Go to Dashboard Overview
             </Button>
           </div>
         </Card>

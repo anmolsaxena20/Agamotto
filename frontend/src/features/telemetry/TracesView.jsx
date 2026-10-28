@@ -281,74 +281,62 @@ export function TracesView({ initialTraceId, onOpenAiChat }) {
               </div>
 
               {/* Waterfall Rows */}
-              <WaterfallTree
-                node={traceFlow?.root || {
-                  id: 'sp_root',
-                  name: 'HTTP SERVER GET /orgs/:orgId/analytics/overview',
-                  service: 'server-gateway',
-                  durationMs: 48.6,
-                  startTimeMs: 0,
-                  children: [
-                    { id: 'sp_mw', name: 'middleware: authenticate', service: 'server-gateway', durationMs: 4.2, startTimeMs: 0.8, children: [] },
-                    {
-                      id: 'sp_proxy',
-                      name: 'proxy: ingestion-gateway',
-                      service: 'server-gateway',
-                      durationMs: 40.1,
-                      startTimeMs: 5.4,
-                      children: [
-                        { id: 'sp_db', name: 'ClickHouse quantileTDigest() aggregation', service: 'clickhouse-cluster', durationMs: 24.2, startTimeMs: 8.0, children: [] },
-                      ],
-                    },
-                  ],
-                }}
-                totalDuration={traceFlow?.totalDurationMs || 48.6}
-                depth={0}
-              />
+              {traceFlow?.root ? (
+                <WaterfallTree
+                  node={traceFlow.root}
+                  totalDuration={traceFlow?.totalDurationMs || 1}
+                  depth={0}
+                />
+              ) : (
+                <div style={{ padding: '24px', textAlign: 'center', color: 'var(--text-muted)', fontSize: '13px' }}>
+                  No hierarchical span tree recorded for trace {selectedTraceId}.
+                </div>
+              )}
             </div>
           )}
 
           {/* Flat Span Attributes Mode */}
           {activeViewMode === 'flat' && (
             <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', maxHeight: '440px', overflowY: 'auto' }}>
-              {(traceDetail?.spans || [
-                { spanId: 'sp_01', parentSpanId: null, name: 'GET /orgs/:orgId/analytics/overview', service: 'server-gateway', durationMs: 48.6, statusCode: 200, startTime: '0ms' },
-                { spanId: 'sp_02', parentSpanId: 'sp_01', name: 'middleware: authenticate', service: 'server-gateway', durationMs: 4.2, statusCode: 200, startTime: '+0.8ms' },
-                { spanId: 'sp_03', parentSpanId: 'sp_01', name: 'proxy: query analytics-gateway', service: 'server-gateway', durationMs: 40.1, statusCode: 200, startTime: '+5.4ms' },
-                { spanId: 'sp_04', parentSpanId: 'sp_03', name: 'execute ClickHouse aggregation', service: 'ingestion-gateway', durationMs: 24.2, statusCode: 200, startTime: '+8.0ms' },
-              ]).map((s) => (
-                <div
-                  key={s.spanId}
-                  style={{
-                    padding: '12px',
-                    backgroundColor: 'var(--surface-input)',
-                    border: '1px solid var(--border)',
-                    borderRadius: 'var(--radius-sm)',
-                    display: 'flex',
-                    flexDirection: 'column',
-                    gap: '6px',
-                  }}
-                >
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                      <span style={{ fontWeight: 600, color: 'var(--text)' }}>{s.name}</span>
-                      <span style={{ fontSize: '11px', padding: '1px 6px', backgroundColor: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 'var(--radius-sm)', fontFamily: 'var(--font-mono)' }}>
-                        {s.service}
+              {(traceDetail?.spans || []).length === 0 ? (
+                <div style={{ padding: '24px', textAlign: 'center', color: 'var(--text-muted)', fontSize: '13px' }}>
+                  No span attributes found for this trace.
+                </div>
+              ) : (
+                (traceDetail?.spans || []).map((s) => (
+                  <div
+                    key={s.spanId}
+                    style={{
+                      padding: '12px',
+                      backgroundColor: 'var(--surface-input)',
+                      border: '1px solid var(--border)',
+                      borderRadius: 'var(--radius-sm)',
+                      display: 'flex',
+                      flexDirection: 'column',
+                      gap: '6px',
+                    }}
+                  >
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                        <span style={{ fontWeight: 600, color: 'var(--text)' }}>{s.name}</span>
+                        <span style={{ fontSize: '11px', padding: '1px 6px', backgroundColor: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 'var(--radius-sm)', fontFamily: 'var(--font-mono)' }}>
+                          {s.service}
+                        </span>
+                      </div>
+                      <span style={{ fontSize: '12px', fontFamily: 'var(--font-mono)', color: 'var(--accent)', fontWeight: 600 }}>
+                        {s.durationMs}ms
                       </span>
                     </div>
-                    <span style={{ fontSize: '12px', fontFamily: 'var(--font-mono)', color: 'var(--accent)', fontWeight: 600 }}>
-                      {s.durationMs}ms
-                    </span>
-                  </div>
 
-                  <div style={{ display: 'flex', gap: '16px', fontSize: '11px', color: 'var(--text-muted)', fontFamily: 'var(--font-mono)' }}>
-                    <span>span_id: {s.spanId}</span>
-                    <span>parent_id: {s.parentSpanId || 'root'}</span>
-                    <span>offset: {s.startTime}</span>
-                    <span>status: {s.statusCode}</span>
+                    <div style={{ display: 'flex', gap: '16px', fontSize: '11px', color: 'var(--text-muted)', fontFamily: 'var(--font-mono)' }}>
+                      <span>span_id: {s.spanId}</span>
+                      <span>parent_id: {s.parentSpanId || 'root'}</span>
+                      <span>offset: {s.startTime}</span>
+                      <span>status: {s.statusCode}</span>
+                    </div>
                   </div>
-                </div>
-              ))}
+                ))
+              )}
             </div>
           )}
         </div>
