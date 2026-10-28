@@ -4,36 +4,65 @@ Next-generation, high-performance distributed observability and telemetry platfo
 
 ---
 
+## Live Demo & Test Credentials
+
+Explore the live platform at **[https://agamotto.tech](https://agamotto.tech)**:
+
+| Parameter | Value |
+|---|---|
+| **Platform URL** | [https://agamotto.tech](https://agamotto.tech) |
+| **Login Email** | `anmosxn2005@gmail.com` |
+| **Password** | `Anmol@20012005` |
+| **Active Organization** | Switch to **`agamotto_org`** upon login |
+
+> [!TIP]
+> After logging in, switch your active organization in the top navigation bar to **`agamotto_org`** to view all live production metrics, distributed trace waterfalls, correlated logs, and AI-driven root-cause diagnostics.
+
+---
+
 ## Architecture Overview
 
-Agamotto is structured as a distributed microservices platform built for high throughput and sub-millisecond telemetry ingestion:
+Agamotto is structured as a distributed microservices platform built for high throughput, sub-millisecond telemetry ingestion, and secure multi-tenant AI diagnostics:
 
 ```mermaid
 flowchart TD
     ClientApps[Client Applications / Node SDK] -->|OTLP gRPC :4317| IngestGateway[Ingestion Gateway :4317 / :4318]
     IngestGateway -->|ClickHouse Protocol| ClickHouse[(ClickHouse Columnar DB)]
     
-    WebBrowser[Web Dashboard / UI] -->|HTTPS :3000| Server[Core API Server :3000]
-    Server -->|gRPC :5000| EmailService[Email Service :5000]
-    Server -->|ORM Builder| NeonDB[(Neon PostgreSQL)]
-    Server -->|Internal HTTP Analytics Proxy| IngestGateway
+    WebBrowser[Web Dashboard / UI Client] -->|HTTPS :3000| Server[Core API Server :3000]
     
-    EmailService -->|REST API| Resend[Resend Email Provider]
+    subgraph Core Backend Services
+        Server -->|ORM Builder| NeonDB[(Neon PostgreSQL)]
+        Server -->|gRPC :5000| EmailService[Email Service :5000]
+        Server -->|Internal HTTP Analytics Proxy| IngestGateway
+        Server -->|Secure Intermediate Proxy / SSE<br/>x-ai-service-key + x-org-id| AIService[AI Diagnostics Service :8000]
+        EmailService -->|REST API| Resend[Resend Email Provider]
+    end
+    
+    subgraph AI Intelligence Engine
+        AIService -->|Cloud REST API| Gemini[Google Gemini 2.5 Flash]
+        AIService -->|Direct SQL Queries| ClickHouse
+        AIService -.->|OTLP Traces, Logs & Gauges :4317| IngestGateway
+    end
 ```
+
+> [!IMPORTANT]
+> **Strict Tenant & Intermediate Proxy Architecture**: The client UI is **never** directly connected to `ai_service` or raw database ports. All AI requests pass through `Server :3000` via `/orgs/:orgId/ai/*`, which verifies user session JWTs, enforces PostgreSQL organization membership (`org:read`), attaches internal credentials (`x-ai-service-key`), propagates W3C trace context, and streams Server-Sent Events (SSE) back to the client.
 
 ---
 
 ## Microservices & Observability Core
 
-All microservices (`server`, `email-service`, `ingestion-gateway`) are natively instrumented with OpenTelemetry SDK v3, featuring:
+All microservices (`server`, `email-service`, `ingestion-gateway`, and `ai_service`) are natively instrumented with OpenTelemetry SDKs (Node.js and Python), featuring:
 
 ### 1. System & Runtime Observable Gauges
-Scraped every 60 seconds via `PeriodicExportingMetricReader` and written to ClickHouse's `metric_samples` table:
+Scraped every 60 seconds via `PeriodicExportingMetricReader` (Node.js) and custom periodic gauge callbacks with `psutil` (Python `ai_service`), written to ClickHouse's `metric_samples` table:
 * `process.memory.usage` (Bytes): Labeled with `memory.type` (`heap_used`, `heap_total`, `rss`, `system_used`, `system_total`).
 * `process.cpu.utilization` (Percent): Delta CPU usage normalized across total machine cores (`0.00%` - `100.00%`).
 
 ### 2. Auto-Instrumentation & Application Metrics
-* **Auto-Instrumentation**: Configured with `@opentelemetry/auto-instrumentations-node` for automatic Express, HTTP, and gRPC tracking.
+* **Node.js Services**: Configured with `@opentelemetry/auto-instrumentations-node` for automatic Express, HTTP, and gRPC tracking.
+* **Python AI Microservice**: Configured with `FastAPIInstrumentor` and custom OTLP span/log batch exporters.
 * **Request Counters & Latencies**:
   * `http.server.request.count` & `http.server.request.duration` (ms) on all incoming HTTP endpoints.
   * `rpc.server.request.count` & `rpc.server.duration` (ms) on all incoming gRPC endpoints.
@@ -160,10 +189,29 @@ All paginated endpoints accept `page` (default: `1`) and `limit` (default: `50`,
 
 ---
 
+## AI Agent & Root-Cause Diagnostics (`/orgs/:orgId/ai`)
+
+Agamotto features an automated AI reasoning layer powered by Google Gemini 2.5 Flash, ClickHouse telemetry synthesis, and Model Context Protocol (MCP) diagnostics. All endpoints require `org:read` permission and are securely proxied through the API Server:
+
+| Method | Endpoint | Description |
+|---|---|---|
+| `POST` | `/orgs/:orgId/ai/ask` | Interactive AI agent streaming chat over **Server-Sent Events (SSE)** |
+| `POST` | `/orgs/:orgId/ai/ask/sync` | Non-streaming synchronous conversational response |
+| `POST` | `/orgs/:orgId/ai/parse-filter` | Converts natural language requests into ClickHouse AST filter queries |
+| `POST` | `/orgs/:orgId/ai/filter` | Executes natural-language-parsed queries across telemetry logs and traces |
+| `GET` | `/orgs/:orgId/ai/anomalies` | Statistical anomaly detection, threshold deviations, and suspect service ranking |
+| `POST` | `/orgs/:orgId/ai/evidence/validate` | Cross-validates assistant diagnostic claims against ground-truth telemetry evidence |
+| `POST` | `/orgs/:orgId/ai/evidence/check` | Granular per-item evidence verification |
+| `GET` | `/orgs/:orgId/ai/mcp/tools` | Enumerates all registered Model Context Protocol diagnostic tools |
+| `POST` | `/orgs/:orgId/ai/mcp/tools/:name/toggle` | Enables or disables an MCP tool |
+
+---
+
 ## Local Development Setup
 
 ### Prerequisites
 - Node.js v22+
+- Python 3.11+ and `uv`
 - Docker and Docker Compose
 - Access to a PostgreSQL instance (or Neon connection string)
 - Access to a ClickHouse instance
@@ -180,10 +228,26 @@ JWT_SECRET="<your-access-token-secret>"
 JWT_REFRESH_SECRET="<your-refresh-token-secret>"
 EMAIL_SERVICE_HOST="localhost"
 EMAIL_SERVICE_PORT=5000
-OTEL_EXPORTER_OTLP_ENDPOINT="localhost:4317"
+OTEL_EXPORTER_OTLP_ENDPOINT="http://localhost:4317"
 AGAMOTTO_API_KEY="<your-ingestion-key>"
 ANALYTICS_GATEWAY_URL="http://localhost:4318"
 ANALYTICS_INTERNAL_TOKEN="<shared-internal-token>"
+AI_SERVICE_URL="http://localhost:8000"
+AI_SERVICE_INTERNAL_KEY="<shared-internal-ai-key>"
+
+# ai_service/.env
+CLICKHOUSE_URL="https://<clickhouse-host>:8443"
+CLICKHOUSE_USER="default"
+CLICKHOUSE_PASSWORD="<password>"
+CLICKHOUSE_DATABASE="agamotto_telemetry"
+CLICKHOUSE_SECURE=true
+EOA_LLM_PROVIDER=gemini
+EOA_LLM_MODEL=gemini-2.5-flash
+GEMINI_API_KEY="<your-gemini-api-key>"
+AGAMOTTO_API_KEY="<your-ingestion-key>"
+OTEL_EXPORTER_OTLP_ENDPOINT="http://localhost:4317"
+AI_SERVICE_INTERNAL_KEY="<shared-internal-ai-key>"
+PORT=8000
 ```
 
 ### Running Locally
@@ -199,7 +263,13 @@ ANALYTICS_INTERNAL_TOKEN="<shared-internal-token>"
    npm install
    npm start
    ```
-3. Start the API Server:
+3. Start the AI Microservice:
+   ```bash
+   cd ai_service
+   uv sync
+   uv run uvicorn app.main:app --host 0.0.0.0 --port 8000
+   ```
+4. Start the API Server:
    ```bash
    cd server
    npm install
