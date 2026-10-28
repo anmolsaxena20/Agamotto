@@ -111,7 +111,7 @@ def test_baseline_calculation(mem_db):
     now = datetime.now(timezone.utc)
     # Insert spans over 10 different minutes in the baseline window (between now - 35m and now - 5m)
     for minute_offset in range(6, 16):
-        bucket_ts = now - timedelta(minutes=minute_offset)
+        bucket_ts = (now - timedelta(minutes=minute_offset)).replace(second=0, microsecond=0)
         # In each minute bucket, insert 10 spans with latencies 10ms..100ms
         for i in range(1, 11):
             insert_span(

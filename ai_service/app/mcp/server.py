@@ -210,6 +210,10 @@ async def get_anomalies(
     return await run_get_anomalies(filter)
 
 
+# ── ASGI Application Entrypoint (for running MCP standalone on port 8003) ────
+app = mcp_server.sse_app()
+
+
 # ── Stdio Entrypoint (for local CLI testing with MCP inspectors) ──────────────
 def main():
     """Run MCP server in stdio mode."""

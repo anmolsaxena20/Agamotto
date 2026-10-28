@@ -19,7 +19,7 @@ _conn: duckdb.DuckDBPyConnection | None = None
 
 
 def get_db() -> duckdb.DuckDBPyConnection:
-    """Return the (lazily-created) DuckDB connection.  Thread-safe singleton."""
+    """Return the (lazily-created) DuckDB connection. Thread-safe singleton."""
     global _conn
     if _conn is None:
         with _lock:
@@ -28,6 +28,13 @@ def get_db() -> duckdb.DuckDBPyConnection:
                 _conn = duckdb.connect(cfg.DUCKDB_PATH)
                 _ensure_schema(_conn)
     return _conn
+
+
+def set_db(conn: duckdb.DuckDBPyConnection | None) -> None:
+    """Explicitly set or override the DuckDB connection (useful for tests and dependency injection)."""
+    global _conn
+    with _lock:
+        _conn = conn
 
 
 def _ensure_schema(conn: duckdb.DuckDBPyConnection) -> None:
@@ -179,3 +186,214 @@ def close_db() -> None:
             if _conn is not None:
                 _conn.close()
                 _conn = None
+
+
+def query_clickhouse_arrow(ch_query: str, parameters: dict | None = None):
+    """Query ClickHouse directly and return an Apache Arrow Table."""
+    from .clickhouse import get_ch_client
+    client = get_ch_client()
+    return client.query_arrow(ch_query, parameters=parameters)
+
+
+def query_clickhouse_df(ch_query: str, parameters: dict | None = None):
+    """Query ClickHouse directly and return a Pandas DataFrame."""
+    from .clickhouse import get_ch_client
+    client = get_ch_client()
+    return client.query_df(ch_query, parameters=parameters)
+
+
+def query_clickhouse_with_duckdb(
+    ch_query: str,
+    duckdb_sql: str,
+    table_alias: str = "ch_data",
+    parameters: dict | None = None,
+) -> list:
+    """
+    Execute a ClickHouse query, register the result into DuckDB with zero-copy,
+    and execute a DuckDB analytical SQL query over it.
+    """
+    conn = get_db()
+    arrow_tbl = query_clickhouse_arrow(ch_query, parameters=parameters)
+    conn.register(table_alias, arrow_tbl)
+    try:
+        cursor = conn.execute(duckdb_sql)
+        cols = [desc[0] for desc in cursor.description]
+        rows = cursor.fetchall()
+        return [dict(zip(cols, row)) for row in rows]
+    finally:
+        try:
+            conn.unregister(table_alias)
+        except Exception:
+            pass
+
+
+def sync_clickhouse_to_duckdb(
+    ch_table: str,
+    target_table: str | None = None,
+    where_clause: str = "",
+    limit: int | None = None,
+) -> int:
+    """
+    Fetch rows from ClickHouse and materialize them into a local DuckDB table.
+    Returns the number of rows synced.
+    """
+    conn = get_db()
+    dest = target_table or ch_table
+    sql = f"SELECT * FROM {ch_table}"
+    if where_clause:
+        sql += f" WHERE {where_clause}"
+    if limit:
+        sql += f" LIMIT {limit}"
+
+    arrow_tbl = query_clickhouse_arrow(sql)
+    row_count = arrow_tbl.num_rows
+    conn.register(f"_sync_temp_{dest}", arrow_tbl)
+    try:
+        conn.execute(f"CREATE OR REPLACE TABLE {dest} AS SELECT * FROM _sync_temp_{dest}")
+    finally:
+        try:
+            conn.unregister(f"_sync_temp_{dest}")
+        except Exception:
+            pass
+    return row_count
+
+
+def verify_spans_in_duckdb(
+    conn: duckdb.DuckDBPyConnection,
+    org_id: str,
+    span_ids: list[str],
+) -> dict[str, dict]:
+    """
+    Feature 19: Verify span IDs against DuckDB for org_id.
+    Returns mapping: span_id -> metadata dictionary.
+    """
+    if not span_ids:
+        return {}
+    placeholders = ", ".join(["?"] * len(span_ids))
+    sql = f"""
+        SELECT
+            span_id,
+            trace_id,
+            service_name,
+            span_name,
+            duration_ns,
+            is_error,
+            status_code,
+            start_ts
+        FROM spans
+        WHERE org_id = ? AND span_id IN ({placeholders})
+    """
+    try:
+        rows = conn.execute(sql, [org_id] + span_ids).fetchall()
+        result = {}
+        for r in rows:
+            dur_ns = int(r[4]) if r[4] is not None else 0
+            result[r[0]] = {
+                "span_id": r[0],
+                "trace_id": r[1],
+                "service_name": r[2],
+                "span_name": r[3],
+                "duration_ns": dur_ns,
+                "duration_ms": round(dur_ns / 1_000_000, 2),
+                "is_error": bool(r[5]),
+                "status_code": r[6] or "UNSET",
+                "timestamp": str(r[7]) if r[7] else None,
+                "source": "duckdb",
+            }
+        return result
+    except Exception as e:
+        import logging
+        logging.getLogger(__name__).warning("Error verifying spans in DuckDB: %s", e)
+        return {}
+
+
+def verify_logs_in_duckdb(
+    conn: duckdb.DuckDBPyConnection,
+    org_id: str,
+    log_ids: list[str],
+) -> dict[str, dict]:
+    """
+    Feature 19: Verify log IDs against DuckDB for org_id.
+    Returns mapping: log_id -> metadata dictionary.
+    """
+    if not log_ids:
+        return {}
+    placeholders = ", ".join(["?"] * len(log_ids))
+    sql = f"""
+        SELECT
+            log_id,
+            trace_id,
+            span_id,
+            service_name,
+            severity_text,
+            body,
+            ts
+        FROM logs
+        WHERE org_id = ? AND log_id IN ({placeholders})
+    """
+    try:
+        rows = conn.execute(sql, [org_id] + log_ids).fetchall()
+        result = {}
+        for r in rows:
+            result[r[0]] = {
+                "log_id": r[0],
+                "trace_id": r[1],
+                "span_id": r[2],
+                "service_name": r[3],
+                "severity_text": r[4] or "INFO",
+                "body": r[5] or "",
+                "timestamp": str(r[6]) if r[6] else None,
+                "source": "duckdb",
+            }
+        return result
+    except Exception as e:
+        import logging
+        logging.getLogger(__name__).warning("Error verifying logs in DuckDB: %s", e)
+        return {}
+
+
+def verify_traces_in_duckdb(
+    conn: duckdb.DuckDBPyConnection,
+    org_id: str,
+    trace_ids: list[str],
+) -> dict[str, dict]:
+    """
+    Feature 19: Verify trace IDs against DuckDB for org_id.
+    Returns mapping: trace_id -> metadata dictionary.
+    """
+    if not trace_ids:
+        return {}
+    placeholders = ", ".join(["?"] * len(trace_ids))
+    sql = f"""
+        SELECT
+            trace_id,
+            any_value(service_name) AS service_name,
+            any_value(span_name) AS root_span_name,
+            count(*) AS span_count,
+            bool_or(is_error) AS has_error,
+            max(start_time_ns + duration_ns) - min(start_time_ns) AS duration_ns
+        FROM spans
+        WHERE org_id = ? AND trace_id IN ({placeholders})
+        GROUP BY trace_id
+    """
+    try:
+        rows = conn.execute(sql, [org_id] + trace_ids).fetchall()
+        result = {}
+        for r in rows:
+            dur_ns = int(r[5]) if r[5] is not None else 0
+            result[r[0]] = {
+                "trace_id": r[0],
+                "service_name": r[1],
+                "span_name": r[2],
+                "span_count": int(r[3]),
+                "is_error": bool(r[4]),
+                "duration_ns": dur_ns,
+                "duration_ms": round(dur_ns / 1_000_000, 2),
+                "source": "duckdb",
+            }
+        return result
+    except Exception as e:
+        import logging
+        logging.getLogger(__name__).warning("Error verifying traces in DuckDB: %s", e)
+        return {}
+

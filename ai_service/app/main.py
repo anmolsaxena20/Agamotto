@@ -20,8 +20,9 @@ from fastapi.responses import JSONResponse
 
 from .config import get_settings
 from .database import get_db, close_db
+from .clickhouse import init_clickhouse_schema, close_ch_client
 from .jobs.scheduler import run_scheduler
-from .routers import anomalies, mcp
+from .routers import anomalies, mcp, telemetry, assistant, evidence, search
 from .mcp.server import mcp_server
 
 # Configure logging
@@ -37,9 +38,16 @@ async def lifespan(app: FastAPI):
     """Lifecycle manager for startup and graceful shutdown."""
     cfg = get_settings()
     logger.info("Initializing ai-service database...")
-    # Initialize DB schema
+    # Initialize DuckDB schema
     conn = get_db()
-    logger.info("Database schema initialized at %s", cfg.DUCKDB_PATH)
+    logger.info("DuckDB schema initialized at %s", cfg.DUCKDB_PATH)
+
+    # Initialize ClickHouse connection and schema
+    try:
+        init_clickhouse_schema()
+        logger.info("ClickHouse initialized at %s:%s", cfg.CLICKHOUSE_HOST, cfg.CLICKHOUSE_PORT)
+    except Exception as e:
+        logger.warning("ClickHouse initial connection warning: %s", e)
 
     # Start the 30-second background anomaly detector scheduler
     scheduler_task = asyncio.create_task(run_scheduler())
@@ -57,6 +65,7 @@ async def lifespan(app: FastAPI):
             except asyncio.CancelledError:
                 pass
         close_db()
+        close_ch_client()
         logger.info("ai-service shutdown complete.")
 
 
@@ -103,6 +112,9 @@ def create_app() -> FastAPI:
             "features": [
                 "feature-7-anomaly-detection",
                 "feature-8-mcp-server",
+                "feature-9-ai-assistant",
+                "feature-19-clickable-evidence",
+                "feature-20-natural-language-search",
             ],
         }
 
@@ -111,6 +123,14 @@ def create_app() -> FastAPI:
     app.include_router(anomalies.router, prefix="/api/v1")
     app.include_router(mcp.router)
     app.include_router(mcp.router, prefix="/api/v1")
+    app.include_router(telemetry.router)
+    app.include_router(telemetry.router, prefix="/api/v1")
+    app.include_router(assistant.router)
+    app.include_router(assistant.router, prefix="/api/v1")
+    app.include_router(evidence.router)
+    app.include_router(evidence.router, prefix="/api/v1")
+    app.include_router(search.router)
+    app.include_router(search.router, prefix="/api/v1")
 
     # Mount native MCP SSE transport
     app.mount("/mcp/sse", mcp_server.sse_app())

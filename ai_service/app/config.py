@@ -5,6 +5,10 @@ All values can be overridden through environment variables.
 
 import os
 from functools import lru_cache
+from urllib.parse import urlparse
+from dotenv import load_dotenv
+
+load_dotenv()
 
 
 def _positive_float(key: str, default: float, minimum: float = 1e-9) -> float:
@@ -47,6 +51,28 @@ class Settings:
     # ── Database ──────────────────────────────────────────────────────────────
     DUCKDB_PATH: str = os.environ.get("DUCKDB_PATH", ":memory:")
 
+    # ── ClickHouse ────────────────────────────────────────────────────────────
+    CLICKHOUSE_URL: str = os.environ.get(
+        "CLICKHOUSE_URL",
+        "https://w1c3sdh2c2.asia-northeast1.gcp.clickhouse.cloud:8443",
+    )
+    CLICKHOUSE_HOST: str = os.environ.get(
+        "CLICKHOUSE_HOST", "w1c3sdh2c2.asia-northeast1.gcp.clickhouse.cloud"
+    )
+    CLICKHOUSE_PORT: int = _positive_int("CLICKHOUSE_PORT", 8443)
+    CLICKHOUSE_USER: str = os.environ.get("CLICKHOUSE_USER", "default")
+    CLICKHOUSE_PASSWORD: str = os.environ.get("CLICKHOUSE_PASSWORD", "0Zeh9mt9dCf2_")
+    CLICKHOUSE_DATABASE: str = os.environ.get(
+        "CLICKHOUSE_DATABASE", "agamotto_telemetry"
+    )
+    CLICKHOUSE_SECURE: bool = os.environ.get(
+        "CLICKHOUSE_SECURE", "true"
+    ).lower() in ("true", "1", "yes")
+    CLICKHOUSE_CLOUD_API_KEY: str = os.environ.get("CLICKHOUSE_CLOUD_API_KEY", "")
+    CLICKHOUSE_CLOUD_API_SECRET: str = os.environ.get(
+        "CLICKHOUSE_CLOUD_API_SECRET", ""
+    )
+
     # ── JWT verification ──────────────────────────────────────────────────────
     JWT_SECRET: str = os.environ.get(
         "JWT_SECRET",
@@ -88,6 +114,15 @@ class Settings:
         for t in os.environ.get("EOA_MCP_TOOLS_DISABLED", "").split(",")
         if t.strip()
     ]
+
+    # ── LLM Settings (Feature 9) ──────────────────────────────────────────────
+    EOA_LLM_PROVIDER: str = os.environ.get("EOA_LLM_PROVIDER", "mock")
+    EOA_LLM_MODEL: str = os.environ.get("EOA_LLM_MODEL", "gemini-1.5-flash")
+    EOA_LLM_API_KEY: str = os.environ.get("EOA_LLM_API_KEY", os.environ.get("GEMINI_API_KEY", ""))
+    EOA_AGENT_MAX_TOOL_CALLS: int = _positive_int("EOA_AGENT_MAX_TOOL_CALLS", 8)
+    EOA_AGENT_TIMEOUT_S: int = _positive_int("EOA_AGENT_TIMEOUT_S", 45)
+    EOA_MAX_TOOL_RESULT_CHARS: int = _positive_int("EOA_MAX_TOOL_RESULT_CHARS", 6000)
+    EOA_CACHE_TTL_S: int = _positive_int("EOA_CACHE_TTL_S", 300)
 
 
 @lru_cache(maxsize=1)
