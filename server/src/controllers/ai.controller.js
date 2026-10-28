@@ -1,4 +1,4 @@
-import { context, metrics, propagation, trace } from '@opentelemetry/api';
+import { context, metrics, propagation, trace, SpanKind } from '@opentelemetry/api';
 import { logger } from '../observability/index.js';
 
 const log = logger('server.ai');
@@ -50,7 +50,7 @@ export async function askAssistantStream(req, res, next) {
   return tracer.startActiveSpan(
     'HTTP POST /ask -> ai-service',
     {
-      kind: trace.SpanKind.CLIENT,
+      kind: SpanKind.CLIENT,
       attributes: {
         'peer.service': 'ai-service',
         'http.url': targetUrl,
@@ -157,7 +157,7 @@ async function forwardJson(req, res, next, endpointPath, method = 'POST') {
   return tracer.startActiveSpan(
     `HTTP ${method} /${endpointPath} -> ai-service`,
     {
-      kind: trace.SpanKind.CLIENT,
+      kind: SpanKind.CLIENT,
       attributes: {
         'peer.service': 'ai-service',
         'http.url': targetUrl.toString(),
