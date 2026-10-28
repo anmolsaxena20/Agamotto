@@ -9,6 +9,7 @@ import orgRoutes from './routes/org.routes.js';
 import permissionRoutes from './routes/permission.routes.js';
 import internalRoutes from './routes/internal.routes.js';
 import analyticsRoutes from './routes/analytics.routes.js';
+import aiRoutes from './routes/ai.routes.js';
 import { errorHandler } from './middleware/errorHandler.js';
 import { logger } from './observability/index.js';
 
@@ -62,6 +63,7 @@ export function createApp() {
   app.use('/auth', authRoutes);
   app.use('/orgs', orgRoutes);
   app.use('/orgs/:orgId/analytics', analyticsRoutes);
+  app.use('/orgs/:orgId/ai', aiRoutes);
   app.use('/permissions', permissionRoutes);
   app.use('/internal', internalRoutes);
 

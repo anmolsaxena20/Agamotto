@@ -1,16 +1,12 @@
 """
-auth.py – JWT authentication for the ai-service.
+auth.py – Authentication and authorization for the ai-service.
 
-The ai-service reads the same JWT secret as the Node.js support-api /
-Agamotto server (EOA_JWT_SECRET / JWT_SECRET env var), so the same token
-issued by the Node.js server works here.
-
-Token claims used:
-  sub             → user id
-  org_id          → organisation (the authoritative tenancy boundary)
-  visible_services → optional list of service names the user may see
-
-org_id is NEVER read from the request body or query string.
+Supports:
+1. Server-to-Service Internal API Key (x-ai-service-key / x-api-key)
+   When requests are proxied through the Agamotto Node.js core server,
+   the server verifies user session and org permissions, then passes
+   the validated tenancy context in x-org-id and x-user-id.
+2. Direct JWT Bearer Token / Cookie (backward compatibility and direct test tokens)
 """
 
 from __future__ import annotations
@@ -49,17 +45,17 @@ def _decode_token(token: str) -> dict:
         )
 
 
-def _extract_token(request: Request, creds: Optional[HTTPAuthorizationCredentials]) -> str:
+def _extract_token(request: Request, creds: Optional[HTTPAuthorizationCredentials]) -> Optional[str]:
     """Try Bearer header first, then access_token cookie."""
     if creds and creds.credentials:
         return creds.credentials
     cookie = request.cookies.get("access_token")
     if cookie:
         return cookie
-    raise HTTPException(
-        status_code=status.HTTP_401_UNAUTHORIZED,
-        detail="Authentication required",
-    )
+    auth_header = request.headers.get("authorization") or request.headers.get("Authorization")
+    if auth_header and auth_header.startswith("Bearer "):
+        return auth_header[7:].strip()
+    return None
 
 
 async def get_current_org(
@@ -67,19 +63,55 @@ async def get_current_org(
     creds: Optional[HTTPAuthorizationCredentials] = Depends(_bearer),
 ) -> dict:
     """
-    FastAPI dependency that validates the JWT and returns a dict with:
-      org_id, sub, visible_services
-    
-    Raises 401 if the token is missing, expired, or invalid.
-    Raises 403 if org_id claim is absent (should never happen with well-formed tokens).
+    FastAPI dependency that validates either:
+      a) Internal API key (x-ai-service-key / x-api-key) + x-org-id from Core Server
+      b) Valid User JWT carrying an org_id claim
     """
-    token = _extract_token(request, creds)
-    payload = _decode_token(token)
+    cfg = get_settings()
 
+    # 1. Check for Server Internal API Key
+    api_key = (
+        request.headers.get("x-ai-service-key")
+        or request.headers.get("x-api-key")
+        or request.query_params.get("apiKey")
+    )
+    if api_key:
+        if api_key != cfg.AI_SERVICE_INTERNAL_KEY:
+            logger.warning("Rejected request with invalid x-ai-service-key")
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="Invalid AI service API key",
+            )
+        org_id = (
+            request.headers.get("x-org-id")
+            or request.headers.get("x-organization-id")
+            or request.query_params.get("orgId")
+        )
+        if not org_id:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="x-org-id header is required for internal API calls",
+            )
+        user_id = request.headers.get("x-user-id") or "server-internal"
+        visible_services_raw = request.headers.get("x-visible-services") or ""
+        visible_services = [s.strip() for s in visible_services_raw.split(",") if s.strip()]
+        return {
+            "sub": user_id,
+            "org_id": org_id,
+            "visible_services": visible_services,
+        }
+
+    # 2. Check for JWT authentication
+    token = _extract_token(request, creds)
+    if not token:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Authentication required: provide x-ai-service-key or Bearer token",
+        )
+
+    payload = _decode_token(token)
     org_id = payload.get("org_id") or payload.get("orgId")
     if not org_id:
-        # Fall back to sub if org_id isn't in the token yet (dev tokens)
-        # In production every token must have org_id.
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Token does not carry an org_id claim",

@@ -24,6 +24,7 @@ from .clickhouse import init_clickhouse_schema, close_ch_client
 from .jobs.scheduler import run_scheduler
 from .routers import anomalies, mcp, telemetry, assistant, evidence, search
 from .mcp.server import mcp_server
+from .observability import setup_observability
 
 # Configure logging
 logging.basicConfig(
@@ -135,12 +136,17 @@ def create_app() -> FastAPI:
     # Mount native MCP SSE transport
     app.mount("/mcp/sse", mcp_server.sse_app())
 
+    # Initialize OpenTelemetry instrumentation
+    setup_observability(app, service_name="ai-service")
+
     return app
 
 
 app = create_app()
 
 if __name__ == "__main__":
+    import os
     import uvicorn
 
-    uvicorn.run("app.main:app", host="0.0.0.0", port=8002, reload=True)
+    port = int(os.environ.get("PORT", "8000"))
+    uvicorn.run("app.main:app", host="0.0.0.0", port=port, reload=True)

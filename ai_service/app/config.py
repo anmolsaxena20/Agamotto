@@ -73,6 +73,11 @@ class Settings:
         "CLICKHOUSE_CLOUD_API_SECRET", ""
     )
 
+    # ── Internal Service Authentication & Observability ──────────────────────
+    AI_SERVICE_INTERNAL_KEY: str = os.environ.get("AI_SERVICE_INTERNAL_KEY", "ak_internal_ai_d8f7e2a1b94c3e5a")
+    OTEL_EXPORTER_OTLP_ENDPOINT: str = os.environ.get("OTEL_EXPORTER_OTLP_ENDPOINT", "http://localhost:4317")
+    AGAMOTTO_API_KEY: str = os.environ.get("AGAMOTTO_API_KEY", "")
+
     # ── JWT verification ──────────────────────────────────────────────────────
     JWT_SECRET: str = os.environ.get(
         "JWT_SECRET",

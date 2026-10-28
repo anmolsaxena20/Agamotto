@@ -8,8 +8,9 @@ import time
 import logging
 from typing import Any, Dict, List, Optional
 from pydantic import BaseModel, Field
-from fastapi import APIRouter, HTTPException, Query
+from fastapi import APIRouter, Depends, HTTPException, Query
 
+from app.auth import get_current_org
 from app.clickhouse import get_ch_client
 from app.database import (
     get_db,
@@ -106,7 +107,7 @@ def db_health():
 
 
 @router.post("/clickhouse/query")
-def execute_clickhouse_query(req: ClickHouseQueryRequest):
+def execute_clickhouse_query(req: ClickHouseQueryRequest, auth: dict = Depends(get_current_org)):
     """
     Execute a read-only query directly against ClickHouse.
     """
@@ -130,7 +131,7 @@ def execute_clickhouse_query(req: ClickHouseQueryRequest):
 
 
 @router.post("/duckdb/query")
-def execute_duckdb_query(req: DuckDBQueryRequest):
+def execute_duckdb_query(req: DuckDBQueryRequest, auth: dict = Depends(get_current_org)):
     """
     Execute a SQL query inside DuckDB.
     """
@@ -152,7 +153,7 @@ def execute_duckdb_query(req: DuckDBQueryRequest):
 
 
 @router.post("/federated/query")
-def execute_federated_query(req: FederatedQueryRequest):
+def execute_federated_query(req: FederatedQueryRequest, auth: dict = Depends(get_current_org)):
     """
     Stream dataset from ClickHouse into DuckDB via zero-copy Arrow,
     and execute an analytical DuckDB query over it.
@@ -174,7 +175,7 @@ def execute_federated_query(req: FederatedQueryRequest):
 
 
 @router.post("/sync")
-def sync_table(req: SyncRequest):
+def sync_table(req: SyncRequest, auth: dict = Depends(get_current_org)):
     """
     Sync or snapshot a ClickHouse table into a DuckDB table.
     """
