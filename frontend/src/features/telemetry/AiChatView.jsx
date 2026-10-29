@@ -23,7 +23,7 @@ import { useOrg } from '../../context/OrgContext.jsx';
 import { aiService } from '../../services/apiServices.js';
 import { Card } from '../../components/Card.jsx';
 import { Button } from '../../components/Button.jsx';
-import { ClickableEvidence } from '../../components/ClickableEvidence.jsx';
+import { ClickableEvidence, SmartAiMessage } from '../../components/ClickableEvidence.jsx';
 
 export function AiChatView({ onSelectTrace, onSelectService, onSelectEndpoint }) {
   const { currentOrg } = useOrg();
@@ -145,13 +145,15 @@ export function AiChatView({ onSelectTrace, onSelectService, onSelectEndpoint })
         query: textToSend.trim(),
         conversationId: convId,
         signal: abortController.signal,
-        onChunk: (chunk) => {
+        onChunk: (chunk, metadata) => {
           setMessages((prev) =>
-            prev.map((msg) =>
-              msg.id === assistantMessageId
-                ? { ...msg, content: msg.content + chunk }
-                : msg
-            )
+            prev.map((msg) => {
+              if (msg.id !== assistantMessageId) return msg;
+              if (metadata?.isFinal) {
+                return { ...msg, content: chunk, rawAnswer: metadata };
+              }
+              return { ...msg, content: (msg.content || '') + chunk };
+            })
           );
         },
         onToolCall: (toolCall) => {
@@ -382,96 +384,30 @@ export function AiChatView({ onSelectTrace, onSelectService, onSelectEndpoint })
                     </div>
                   )}
 
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-                    {/* Tool Calls */}
-                    {msg.tools && msg.tools.length > 0 && (
-                      <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
-                        {msg.tools.map((tool, idx) => {
-                          const isExp = expandedTools[`${msg.id}-${idx}`];
-                          return (
-                            <div
-                              key={idx}
-                              style={{
-                                backgroundColor: 'var(--surface-input)',
-                                border: '1px solid var(--border)',
-                                borderRadius: 'var(--radius-sm)',
-                                padding: '6px 10px',
-                                fontSize: '11px',
-                                fontFamily: 'var(--font-mono)',
-                              }}
-                            >
-                              <div
-                                onClick={() => toggleToolExpanded(msg.id, idx)}
-                                style={{
-                                  display: 'flex',
-                                  alignItems: 'center',
-                                  justifyContent: 'space-between',
-                                  cursor: 'pointer',
-                                  color: 'var(--accent)',
-                                }}
-                              >
-                                <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                                  <Wrench size={12} />
-                                  <span>Executed MCP Tool: {tool.name || tool.tool || 'telemetry_tool'}</span>
-                                </div>
-                                {isExp ? <ChevronUp size={12} /> : <ChevronDown size={12} />}
-                              </div>
-
-                              {isExp && (
-                                <pre
-                                  style={{
-                                    marginTop: '6px',
-                                    padding: '8px',
-                                    backgroundColor: 'var(--bg)',
-                                    borderRadius: 'var(--radius-sm)',
-                                    fontSize: '11px',
-                                    color: 'var(--text-secondary)',
-                                    overflowX: 'auto',
-                                    whiteSpace: 'pre-wrap',
-                                  }}
-                                >
-                                  {JSON.stringify(tool.arguments || tool.params || tool, null, 2)}
-                                </pre>
-                              )}
-                            </div>
-                          );
-                        })}
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', flex: 1, minWidth: 0 }}>
+                    {isUser ? (
+                      <div
+                        style={{
+                          padding: '12px 18px',
+                          borderRadius: '16px 16px 2px 16px',
+                          backgroundColor: 'var(--accent-subtle)',
+                          border: '1px solid rgba(224, 176, 80, 0.4)',
+                          color: 'var(--text)',
+                          fontSize: '13px',
+                          lineHeight: '1.6',
+                          alignSelf: 'flex-end',
+                        }}
+                      >
+                        {msg.content}
                       </div>
-                    )}
-
-                    {/* Content Box */}
-                    <div
-                      style={{
-                        padding: '14px 18px',
-                        borderRadius: isUser ? '16px 16px 2px 16px' : '16px 16px 16px 2px',
-                        backgroundColor: isUser ? 'var(--accent-subtle)' : 'var(--surface-subtle)',
-                        border: `1px solid ${isUser ? 'rgba(224, 176, 80, 0.4)' : 'var(--border)'}`,
-                        color: 'var(--text)',
-                        fontSize: '13px',
-                        lineHeight: '1.6',
-                      }}
-                    >
-                      <ClickableEvidence
-                        text={msg.content}
+                    ) : (
+                      <SmartAiMessage
+                        message={msg}
                         onSelectTrace={onSelectTrace}
                         onSelectService={onSelectService}
                         onSelectEndpoint={onSelectEndpoint}
                       />
-
-                      {msg.isStreaming && (
-                        <span
-                          style={{
-                            display: 'inline-block',
-                            width: '6px',
-                            height: '14px',
-                            backgroundColor: 'var(--accent)',
-                            marginLeft: '4px',
-                            verticalAlign: 'middle',
-                            animation: 'pulse 1s infinite',
-                          }}
-                        />
-                      )}
-                    </div>
+                    )}
 
                     {/* Actions Row */}
                     {!isUser && !msg.isStreaming && msg.content && msg.id !== 'welcome' && (
