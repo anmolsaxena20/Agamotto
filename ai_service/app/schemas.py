@@ -208,15 +208,27 @@ class FilterChip(BaseModel):
 class ParseFilterRequest(BaseModel):
     """
     Request payload for POST /parse-filter (Feature 20).
-    Receives sentence, optional client current time, and optional known service names.
+    Receives sentence or query, optional client current time, and optional known service names.
     """
-    sentence: str = Field(..., description="Natural language search query from Logs or Traces search bar")
+    sentence: Optional[str] = Field(default=None, description="Natural language search query from Logs or Traces search bar")
+    query: Optional[str] = Field(default=None, description="Alternative field for search query")
+    domain: Optional[str] = Field(default=None, description="Alternative field for target domain")
     current_time: Optional[str] = Field(default=None, description="Client current timestamp (ISO 8601 UTC)")
     services: Optional[list[str]] = Field(default=None, description="List of known service names for the organization")
     target: Optional[str] = Field(default="all", description="'logs', 'traces', or 'all'")
     execute: bool = Field(default=False, description="If True, also execute search against DuckDB and ClickHouse")
     retention_days: int = Field(default=30, ge=1, le=365, description="Organization plan retention in days")
     limit: int = Field(default=100, ge=1, le=1000)
+
+    @model_validator(mode="before")
+    @classmethod
+    def normalize_fields(cls, data: Any) -> Any:
+        if isinstance(data, dict):
+            s = data.get("sentence") or data.get("query") or ""
+            data["sentence"] = s
+            if not data.get("target") and data.get("domain"):
+                data["target"] = data["domain"]
+        return data
 
 
 class ParseFilterResponse(BaseModel):
@@ -239,8 +251,17 @@ class ExecuteFilterRequest(BaseModel):
     """
     filter: Filter
     target: str = Field(default="all", description="'logs', 'traces', or 'all'")
+    domain: Optional[str] = Field(default=None, description="Alternative field name for target")
     engine: str = Field(default="auto", description="'auto', 'duckdb', 'clickhouse', 'federated'")
     limit: int = Field(default=100, ge=1, le=1000)
+
+    @model_validator(mode="before")
+    @classmethod
+    def normalize_target(cls, data: Any) -> Any:
+        if isinstance(data, dict):
+            if not data.get("target") and data.get("domain"):
+                data["target"] = data["domain"]
+        return data
 
 
 class ExecuteFilterResponse(BaseModel):

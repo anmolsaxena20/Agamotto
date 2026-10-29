@@ -377,31 +377,53 @@ export const aiService = {
                 onError?.(new Error(parsed.message || parsed.error || 'AI agent error'));
               } else if (currentEvent === 'tool_start' || currentEvent === 'tool_result' || parsed.tool_call || parsed.tool) {
                 onToolCall?.({
-                  name: parsed.tool || parsed.tool_call?.name || 'telemetry_tool',
+                  name: parsed.tool_name || parsed.tool || parsed.tool_call?.name || 'telemetry_tool',
                   arguments: parsed.arguments || parsed.tool_call?.arguments || {},
                   result: parsed.result_summary || parsed.result || null,
+                  step: parsed.step || 1,
                 });
+              } else if (currentEvent === 'evidence_validated') {
+                // Feature 19: Keep evidence structured, NEVER dump JSON string into message text
+                onEvidenceValidated?.(parsed);
               } else if (currentEvent === 'answer' || parsed.summary !== undefined) {
-                let formattedAnswer = parsed.summary || '';
+                // Natural human conversational formatting
+                const sections = [];
+                if (parsed.summary) {
+                  sections.push(parsed.summary);
+                }
+
                 if (parsed.hypotheses && Array.isArray(parsed.hypotheses) && parsed.hypotheses.length > 0) {
-                  formattedAnswer += '\n\n**Investigative Hypotheses:**\n' + parsed.hypotheses.map((h) => {
-                    const text = typeof h === 'string' ? h : (h.text || JSON.stringify(h));
-                    const confidence = typeof h === 'object' && h.confidence ? ` *(${h.confidence} confidence)*` : '';
-                    return `- ${text}${confidence}`;
-                  }).join('\n');
+                  const list = parsed.hypotheses.map((h) => {
+                    if (typeof h === 'string') return `• **${h}**`;
+                    const conf = h.confidence ? ` _(${h.confidence} confidence)_` : '';
+                    return `• **${h.text || h.hypothesis || JSON.stringify(h)}**${conf}`;
+                  });
+                  sections.push(`### 🔍 Probable Root Causes & Hypotheses\n${list.join('\n')}`);
                 }
+
+                if (parsed.evidence && Array.isArray(parsed.evidence) && parsed.evidence.length > 0) {
+                  const evList = parsed.evidence.map((e) => {
+                    const label = e.label || e.citation || e.evidence_id || 'Telemetry evidence';
+                    const ref = e.span_id ? `\`span:${e.span_id}\`` : e.trace_id ? `\`trace:${e.trace_id}\`` : '';
+                    return `• **${label}** ${ref}`;
+                  });
+                  sections.push(`### 📊 Verified Telemetry Evidence\n${evList.join('\n')}`);
+                }
+
                 if (parsed.next_steps && Array.isArray(parsed.next_steps) && parsed.next_steps.length > 0) {
-                  formattedAnswer += '\n\n**Recommended Next Steps:**\n' + parsed.next_steps.map((s) => `- ${s}`).join('\n');
+                  const steps = parsed.next_steps.map((s, idx) => `${idx + 1}. ${s}`);
+                  sections.push(`### 💡 Recommended Next Actions\n${steps.join('\n')}`);
                 }
-                onChunk?.(formattedAnswer, parsed);
+
+                const formattedAnswer = sections.join('\n\n');
+                onAnswer?.(formattedAnswer, parsed);
+                onChunk?.(formattedAnswer, { isFinal: true, ...parsed });
               } else if (parsed.text !== undefined) {
                 onChunk?.(parsed.text, parsed);
               } else if (parsed.chunk !== undefined) {
                 onChunk?.(parsed.chunk, parsed);
-              } else {
-                // If unknown JSON with message/detail
-                const textFallback = parsed.message || parsed.detail || JSON.stringify(parsed);
-                onChunk?.(textFallback, parsed);
+              } else if (typeof parsed === 'string') {
+                onChunk?.(parsed);
               }
             } catch {
               // Plain text chunk fallback
@@ -430,17 +452,25 @@ export const aiService = {
     });
   },
 
-  async parseFilter(orgId, { query, domain = 'traces' }) {
+  async parseFilter(orgId, { query, sentence, domain = 'traces', target = 'traces' }) {
+    const text = (sentence || query || '').trim();
+    const tgt = domain || target || 'traces';
     return apiRequest(`/orgs/${orgId}/ai/parse-filter`, {
       method: 'POST',
-      body: JSON.stringify({ query, domain }),
+      body: JSON.stringify({
+        sentence: text,
+        query: text,
+        target: tgt,
+        domain: tgt,
+      }),
     });
   },
 
-  async executeFilter(orgId, { filter, domain = 'traces', limit = 50 }) {
-    return apiRequest(`/orgs/${orgId}/ai/filter`, {
+  async executeFilter(orgId, { filter, domain = 'traces', target = 'traces', limit = 50 }) {
+    const tgt = domain || target || 'traces';
+    return apiRequest(`/orgs/${orgId}/ai/search/execute`, {
       method: 'POST',
-      body: JSON.stringify({ filter, domain, limit }),
+      body: JSON.stringify({ filter, domain: tgt, target: tgt, limit }),
     });
   },
 

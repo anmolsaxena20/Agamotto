@@ -182,6 +182,15 @@ async function forwardJson(req, res, next, endpointPath, method = 'POST') {
           if (payload.question && !payload.query) {
             payload.query = payload.question;
           }
+          if (payload.query && !payload.sentence) {
+            payload.sentence = payload.query;
+          }
+          if (payload.sentence && !payload.query) {
+            payload.query = payload.sentence;
+          }
+          if (payload.domain && !payload.target) {
+            payload.target = payload.domain;
+          }
           options.body = JSON.stringify(payload);
         }
 

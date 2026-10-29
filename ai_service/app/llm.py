@@ -79,7 +79,6 @@ class LLMClient:
             logger.info("Using mock LLM engine (no external Google AI Studio key provided)")
             return await self._mock_chat(messages, tools, force_answer)
 
-        url = f"https://generativelanguage.googleapis.com/v1beta/models/{self.model}:generateContent"
         headers = {
             "Content-Type": "application/json",
             "x-goog-api-key": self.api_key,
@@ -183,33 +182,58 @@ class LLMClient:
                 })
             payload["tools"] = [{"function_declarations": fn_decls}]
 
+        candidate_models = [self.model, "gemini-3.5-flash", "gemini-3.6-flash", "gemini-3.7-flash", "gemini-flash-latest"]
+        # Deduplicate while preserving order
+        unique_models = []
+        for mod in candidate_models:
+            if mod and mod not in unique_models:
+                unique_models.append(mod)
+
+        last_error = None
         async with httpx.AsyncClient() as client:
-            resp = await client.post(url, headers=headers, json=payload, timeout=30.0)
-            if resp.status_code != 200:
-                raise RuntimeError(f"Gemini error {resp.status_code}: {resp.text}")
+            for mod in unique_models:
+                url = f"https://generativelanguage.googleapis.com/v1beta/models/{mod}:generateContent"
+                try:
+                    resp = await client.post(url, headers=headers, json=payload, timeout=35.0)
+                    if resp.status_code == 200:
+                        data = resp.json()
+                        candidates = data.get("candidates", [])
+                        if not candidates:
+                            continue
 
-            data = resp.json()
-            candidates = data.get("candidates", [])
-            if not candidates:
-                raise RuntimeError("No candidates returned from Gemini")
+                        parts = candidates[0].get("content", {}).get("parts", [])
+                        tool_calls: list[dict] = []
+                        text_parts: list[str] = []
 
-            parts = candidates[0].get("content", {}).get("parts", [])
-            tool_calls: list[dict] = []
-            text_parts: list[str] = []
+                        for p in parts:
+                            if "functionCall" in p:
+                                fc = p["functionCall"]
+                                tool_calls.append({
+                                    "name": fc.get("name"),
+                                    "arguments": fc.get("args") or {},
+                                    "id": f"call_{len(tool_calls)+1}",
+                                })
+                            elif "text" in p:
+                                text_parts.append(p["text"])
 
-            for p in parts:
-                if "functionCall" in p:
-                    fc = p["functionCall"]
-                    tool_calls.append({
-                        "name": fc.get("name"),
-                        "arguments": fc.get("args") or {},
-                        "id": f"call_{len(tool_calls)+1}",
-                    })
-                elif "text" in p:
-                    text_parts.append(p["text"])
+                        content = "".join(text_parts) if text_parts else None
+                        return content, (tool_calls if tool_calls else None)
+                    else:
+                        last_error = f"Gemini ({mod}) status {resp.status_code}: {resp.text}"
+                        # If 429 quota or 503 unavailable, try next candidate model
+                        if resp.status_code in (429, 503, 404):
+                            logger.warning("Gemini model %s returned %s, trying next candidate...", mod, resp.status_code)
+                            continue
+                        else:
+                            raise RuntimeError(last_error)
+                except httpx.TimeoutException:
+                    logger.warning("Gemini model %s timed out, trying next candidate...", mod)
+                    continue
+                except Exception as e:
+                    last_error = str(e)
+                    continue
 
-            content = "".join(text_parts) if text_parts else None
-            return content, (tool_calls if tool_calls else None)
+        raise RuntimeError(last_error or "All candidate Gemini models failed")
 
     async def _openai_chat(
         self,
