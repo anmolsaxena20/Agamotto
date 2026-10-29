@@ -121,8 +121,8 @@ class Settings:
     ]
 
     # ── LLM Settings (Feature 9) ──────────────────────────────────────────────
-    EOA_LLM_PROVIDER: str = os.environ.get("EOA_LLM_PROVIDER", "mock")
-    EOA_LLM_MODEL: str = os.environ.get("EOA_LLM_MODEL", "gemini-1.5-flash")
+    EOA_LLM_PROVIDER: str = os.environ.get("EOA_LLM_PROVIDER", "gemini")
+    EOA_LLM_MODEL: str = os.environ.get("EOA_LLM_MODEL", "gemini-3.5-flash")
     EOA_LLM_API_KEY: str = os.environ.get("EOA_LLM_API_KEY", os.environ.get("GEMINI_API_KEY", ""))
     EOA_AGENT_MAX_TOOL_CALLS: int = _positive_int("EOA_AGENT_MAX_TOOL_CALLS", 8)
     EOA_AGENT_TIMEOUT_S: int = _positive_int("EOA_AGENT_TIMEOUT_S", 45)

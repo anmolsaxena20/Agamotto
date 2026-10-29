@@ -29,6 +29,7 @@ router.post('/ask/sync', askAssistantSync);
 // 2. Natural-Language Search & Execution
 router.post('/parse-filter', parseFilter);
 router.post('/search/execute', executeFilter);
+router.post('/filter', executeFilter);
 
 // 3. Automated Root-Cause Anomalies
 router.get('/anomalies', getAnomalies);

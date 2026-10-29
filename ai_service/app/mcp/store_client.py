@@ -69,11 +69,72 @@ class TelemetryStoreClient:
         self.base_url = (base_url or get_settings().EOA_STORE_URL).rstrip("/")
 
     # ── Tool 1: get_service_stats ────────────────────────────────────────────
+    # ── Tool 1: get_service_stats ────────────────────────────────────────────
     async def get_service_stats(self, filter_obj: TelemetryFilter) -> List[ServiceStatItem]:
         org_id = get_active_org_id()
         visible = get_active_visible_services()
         services = _effective_services(filter_obj.services, visible)
 
+        # 1. Try ClickHouse Cloud first
+        try:
+            from app.clickhouse import get_ch_client, _clean_str
+            client = get_ch_client()
+            ch_conditions = [
+                "(toString(organization_id) = {org_id:String} OR organization_id = toUUIDOrDefault({org_id:String}, toUUID('00000000-0000-0000-0000-000000000000')))"
+            ]
+            ch_params: dict[str, Any] = {"org_id": org_id}
+            if services:
+                ch_conditions.append("service_name IN ({services:Array(String)})")
+                ch_params["services"] = services
+            elif visible:
+                ch_conditions.append("service_name IN ({services:Array(String)})")
+                ch_params["services"] = visible
+
+            ch_where = " AND ".join(ch_conditions)
+            ch_sql = f"""
+                SELECT
+                    service_name,
+                    count() AS request_count,
+                    countIf(status_code = 2) AS error_count,
+                    round(countIf(status_code = 2) / nullIf(count(), 0), 4) AS error_rate,
+                    quantile(0.50)(duration_ns) AS p50_ns,
+                    quantile(0.95)(duration_ns) AS p95_ns,
+                    quantile(0.99)(duration_ns) AS p99_ns
+                FROM agamotto_telemetry.trace_spans
+                WHERE {ch_where}
+                GROUP BY service_name
+                ORDER BY request_count DESC
+                LIMIT 50
+            """
+            res = client.query(ch_sql, parameters=ch_params)
+            if res.result_rows:
+                ch_results = []
+                for r in res.result_rows:
+                    req_cnt = int(r[1] or 0)
+                    err_cnt = int(r[2] or 0)
+                    err_rate = float(r[3] or 0.0)
+                    p50 = int(r[4] or 0)
+                    p95 = int(r[5] or 0)
+                    p99 = int(r[6] or 0)
+                    ch_results.append(
+                        ServiceStatItem(
+                            service_name=_clean_str(r[0]),
+                            request_count=req_cnt,
+                            error_count=err_cnt,
+                            error_rate=round(err_rate, 4),
+                            p50_ns=p50,
+                            p95_ns=p95,
+                            p99_ns=p99,
+                            p50_ms=round(p50 / 1_000_000, 2),
+                            p95_ms=round(p95 / 1_000_000, 2),
+                            p99_ms=round(p99 / 1_000_000, 2),
+                        )
+                    )
+                return ch_results
+        except Exception as e_ch:
+            logger.debug("ClickHouse get_service_stats fallback: %s", e_ch)
+
+        # 2. DuckDB fallback
         conn = app.database.get_db()
         conditions = ["org_id = ?"]
         params: list[Any] = [org_id]
@@ -147,6 +208,61 @@ class TelemetryStoreClient:
         services = _effective_services(filter_obj.services, visible)
         capped_limit = min(max(1, limit), 50)
 
+        # 1. Try ClickHouse Cloud first
+        try:
+            from app.clickhouse import get_ch_client, _clean_str
+            client = get_ch_client()
+            ch_conditions = [
+                "(toString(organization_id) = {org_id:String} OR organization_id = toUUIDOrDefault({org_id:String}, toUUID('00000000-0000-0000-0000-000000000000')))"
+            ]
+            ch_params: dict[str, Any] = {"org_id": org_id, "limit": capped_limit}
+            if services:
+                ch_conditions.append("service_name IN ({services:Array(String)})")
+                ch_params["services"] = services
+            elif visible:
+                ch_conditions.append("service_name IN ({services:Array(String)})")
+                ch_params["services"] = visible
+            if filter_obj.text:
+                ch_conditions.append("name LIKE {txt:String}")
+                ch_params["txt"] = f"%{filter_obj.text}%"
+
+            ch_where = " AND ".join(ch_conditions)
+            ch_sql = f"""
+                SELECT
+                    trace_id,
+                    span_id,
+                    service_name,
+                    name,
+                    start_time,
+                    duration_ns,
+                    (status_code = 2) AS is_error
+                FROM agamotto_telemetry.trace_spans
+                WHERE {ch_where}
+                ORDER BY duration_ns DESC
+                LIMIT {{limit:UInt32}}
+            """
+            res = client.query(ch_sql, parameters=ch_params)
+            if res.result_rows:
+                return [
+                    SlowSpanItem(
+                        trace_id=_clean_str(r[0]),
+                        span_id=_clean_str(r[1]),
+                        service_name=_clean_str(r[2]),
+                        span_name=_clean_str(r[3]),
+                        start_ts=r[4],
+                        duration_ns=int(r[5] or 0),
+                        duration_ms=round(int(r[5] or 0) / 1_000_000, 2),
+                        self_time_ns=int(r[5] or 0),
+                        self_time_ms=round(int(r[5] or 0) / 1_000_000, 2),
+                        is_error=bool(r[6]),
+                        http_status=500 if r[6] else 200,
+                    )
+                    for r in res.result_rows
+                ]
+        except Exception as e_ch:
+            logger.debug("ClickHouse find_slow_spans fallback: %s", e_ch)
+
+        # 2. DuckDB fallback
         conn = app.database.get_db()
         conditions = ["org_id = ?"]
         params: list[Any] = [org_id]
@@ -243,6 +359,60 @@ class TelemetryStoreClient:
         services = _effective_services(filter_obj.services, visible)
         capped_limit = min(max(1, limit), 50)
 
+        # 1. Try ClickHouse Cloud first
+        try:
+            from app.clickhouse import get_ch_client, _clean_str
+            client = get_ch_client()
+            ch_conditions = [
+                "(toString(organization_id) = {org_id:String} OR organization_id = toUUIDOrDefault({org_id:String}, toUUID('00000000-0000-0000-0000-000000000000')))",
+                "status_code = 2",
+            ]
+            ch_params: dict[str, Any] = {"org_id": org_id, "limit": capped_limit}
+            if services:
+                ch_conditions.append("service_name IN ({services:Array(String)})")
+                ch_params["services"] = services
+            elif visible:
+                ch_conditions.append("service_name IN ({services:Array(String)})")
+                ch_params["services"] = visible
+            if filter_obj.text:
+                ch_conditions.append("name LIKE {txt:String}")
+                ch_params["txt"] = f"%{filter_obj.text}%"
+
+            ch_where = " AND ".join(ch_conditions)
+            ch_sql = f"""
+                SELECT
+                    name AS error_pattern,
+                    service_name,
+                    count() AS cnt,
+                    min(start_time) AS first_seen,
+                    max(start_time) AS last_seen,
+                    any(trace_id) AS sample_trace_id,
+                    any(span_id) AS sample_span_id
+                FROM agamotto_telemetry.trace_spans
+                WHERE {ch_where}
+                GROUP BY name, service_name
+                ORDER BY cnt DESC
+                LIMIT {{limit:UInt32}}
+            """
+            res = client.query(ch_sql, parameters=ch_params)
+            if res.result_rows:
+                return [
+                    ErrorGroupItem(
+                        error_fingerprint=_clean_str(r[0]),
+                        service_name=_clean_str(r[1]),
+                        pattern=_clean_str(r[0]) or "HTTP 500 error",
+                        count=int(r[2]),
+                        first_seen=r[3],
+                        last_seen=r[4],
+                        sample_trace_id=_clean_str(r[5]),
+                        sample_span_id=_clean_str(r[6]),
+                    )
+                    for r in res.result_rows
+                ]
+        except Exception as e_ch:
+            logger.debug("ClickHouse get_error_groups fallback: %s", e_ch)
+
+        # 2. DuckDB fallback
         conn = app.database.get_db()
         conditions = ["org_id = ?", "is_error = TRUE", "error_fingerprint IS NOT NULL", "error_fingerprint != ''"]
         params: list[Any] = [org_id]
@@ -317,6 +487,44 @@ class TelemetryStoreClient:
             ORDER BY start_time_ns ASC
         """
         rows = conn.execute(sql, [org_id, trace_id]).fetchall()
+        if not rows:
+            try:
+                from app.clickhouse import get_ch_client, _clean_str
+                client = get_ch_client()
+                ch_sql = """
+                    SELECT
+                        span_id,
+                        parent_span_id,
+                        service_name,
+                        name,
+                        toUnixTimestamp64Nano(start_time) AS start_time_ns,
+                        start_time AS start_ts,
+                        duration_ns,
+                        (status_code = 2) AS is_error,
+                        200 AS http_status
+                    FROM agamotto_telemetry.trace_spans
+                    WHERE trace_id = {trace_id:String}
+                    ORDER BY start_time ASC
+                """
+                res = client.query(ch_sql, parameters={"trace_id": trace_id})
+                if res.result_rows:
+                    rows = [
+                        (
+                            _clean_str(r[0]),
+                            _clean_str(r[1]) if r[1] else None,
+                            _clean_str(r[2]),
+                            _clean_str(r[3]),
+                            int(r[4] or 0),
+                            r[5],
+                            int(r[6] or 0),
+                            bool(r[7]),
+                            int(r[8] or 200),
+                        )
+                        for r in res.result_rows
+                    ]
+            except Exception as e_ch:
+                logger.debug("ClickHouse get_trace fallback: %s", e_ch)
+
         if not rows:
             return None
 
@@ -426,6 +634,65 @@ class TelemetryStoreClient:
         services = _effective_services(filter_obj.services, visible)
         capped_limit = min(max(1, filter_obj.limit), 50)  # Specification: capped at 50
 
+        # 1. Try ClickHouse Cloud first
+        try:
+            from app.clickhouse import get_ch_client, _clean_str
+            client = get_ch_client()
+            ch_conditions = [
+                "(toString(organization_id) = {org_id:String} OR organization_id = toUUIDOrDefault({org_id:String}, toUUID('00000000-0000-0000-0000-000000000000')))"
+            ]
+            ch_params: dict[str, Any] = {"org_id": org_id, "limit": capped_limit}
+            if services:
+                ch_conditions.append("service_name IN ({services:Array(String)})")
+                ch_params["services"] = services
+            elif visible:
+                ch_conditions.append("service_name IN ({services:Array(String)})")
+                ch_params["services"] = visible
+            if filter_obj.severity:
+                ch_conditions.append("upper(severity_text) IN ({sev:Array(String)})")
+                ch_params["sev"] = [s.upper() for s in filter_obj.severity]
+            if filter_obj.text:
+                ch_conditions.append("body LIKE {txt:String}")
+                ch_params["txt"] = f"%{filter_obj.text}%"
+            if filter_obj.trace_id:
+                ch_conditions.append("trace_id = {tid:String}")
+                ch_params["tid"] = filter_obj.trace_id
+
+            ch_where = " AND ".join(ch_conditions)
+            ch_sql = f"""
+                SELECT
+                    span_id,
+                    time,
+                    trace_id,
+                    span_id,
+                    service_name,
+                    severity_text,
+                    severity_number,
+                    body
+                FROM agamotto_telemetry.telemetry_logs
+                WHERE {ch_where}
+                ORDER BY time DESC
+                LIMIT {{limit:UInt32}}
+            """
+            res = client.query(ch_sql, parameters=ch_params)
+            if res.result_rows:
+                return [
+                    LogItem(
+                        log_id=_clean_str(r[0]),
+                        ts=r[1],
+                        trace_id=_clean_str(r[2]),
+                        span_id=_clean_str(r[3]),
+                        service_name=_clean_str(r[4]),
+                        severity_text=_clean_str(r[5] or "INFO"),
+                        severity_number=int(r[6] or 0),
+                        body=_clean_str(r[7] or ""),
+                    )
+                    for r in res.result_rows
+                ]
+        except Exception as e_ch:
+            logger.debug("ClickHouse search_logs fallback: %s", e_ch)
+
+        # 2. DuckDB fallback
         conn = app.database.get_db()
         conditions = ["org_id = ?"]
         params: list[Any] = [org_id]
@@ -596,6 +863,42 @@ class TelemetryStoreClient:
         visible = get_active_visible_services()
         services = _effective_services(filter_obj.services, visible)
 
+        # 1. Try ClickHouse Cloud first
+        try:
+            from app.clickhouse import get_ch_client, _clean_str
+            client = get_ch_client()
+            ch_sql = """
+                SELECT
+                    parent.service_name AS caller,
+                    child.service_name AS callee,
+                    count() AS call_count,
+                    countIf(child.status_code = 2) AS error_count,
+                    round(quantile(0.95)(child.duration_ns) / 1000000, 2) AS p95_latency_ms
+                FROM agamotto_telemetry.trace_spans child
+                INNER JOIN agamotto_telemetry.trace_spans parent ON child.parent_span_id = parent.span_id
+                WHERE (toString(child.organization_id) = {org_id:String} OR child.organization_id = toUUIDOrDefault({org_id:String}, toUUID('00000000-0000-0000-0000-000000000000')))
+                  AND child.service_name != parent.service_name
+                GROUP BY caller, callee
+                ORDER BY call_count DESC
+                LIMIT 100
+            """
+            res = client.query(ch_sql, parameters={"org_id": org_id})
+            if res.result_rows:
+                return [
+                    TopologyEdgeItem(
+                        caller=_clean_str(r[0]),
+                        callee=_clean_str(r[1]),
+                        call_count=int(r[2]),
+                        p95_ns=int((r[4] or 0) * 1_000_000),
+                        p95_ms=float(r[4] or 0.0),
+                        error_rate=round(float(r[3] or 0.0) / max(1, int(r[2])), 4),
+                    )
+                    for r in res.result_rows
+                ]
+        except Exception as e_ch:
+            logger.debug("ClickHouse get_topology fallback: %s", e_ch)
+
+        # 2. DuckDB fallback
         conn = app.database.get_db()
         conditions = ["c.org_id = ?", "c.service_name != p.service_name"]
         params: list[Any] = [org_id]
