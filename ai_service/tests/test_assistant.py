@@ -295,3 +295,178 @@ def test_ask_requires_authentication():
     client = TestClient(fastapi_app)
     res = client.post("/ask/sync", json={"question": "anything"})
     assert res.status_code == 401
+
+
+# ── Tests for Bug Fixes: MCP tool definitions, _mock_chat canonical fallbacks, Gemini collision, loop limits ──
+
+def test_mcp_client_tool_specific_definitions_and_required_fields():
+    """Requirement 1 & 2: MCP tool definitions must be tool-specific and mark required fields."""
+    from app.mcp_client import McpClient
+
+    client = McpClient(org_id="test-org")
+    defs = client.get_tool_definitions()
+    defs_by_name = {d["function"]["name"]: d["function"] for d in defs}
+
+    assert "get_trace" in defs_by_name
+    get_trace_params = defs_by_name["get_trace"]["parameters"]
+    assert "trace_id" in get_trace_params["properties"]
+    assert "filter" not in get_trace_params["properties"]
+    assert "limit" not in get_trace_params["properties"]
+    assert "required" in get_trace_params
+    assert "trace_id" in get_trace_params["required"]
+
+    assert "compare_traces" in defs_by_name
+    cmp_params = defs_by_name["compare_traces"]["parameters"]
+    assert "trace_id" in cmp_params["properties"]
+    assert "baseline_trace_id" in cmp_params["properties"]
+    assert "filter" not in cmp_params["properties"]
+    assert "required" in cmp_params
+    assert "trace_id" in cmp_params["required"]
+
+    assert "get_service_stats" in defs_by_name
+    assert "filter" in defs_by_name["get_service_stats"]["parameters"]["properties"]
+    assert "trace_id" not in defs_by_name["get_service_stats"]["parameters"]["properties"]
+
+    assert "find_slow_spans" in defs_by_name
+    assert "filter" in defs_by_name["find_slow_spans"]["parameters"]["properties"]
+    assert "limit" in defs_by_name["find_slow_spans"]["parameters"]["properties"]
+    assert "trace_id" not in defs_by_name["find_slow_spans"]["parameters"]["properties"]
+
+
+@pytest.mark.asyncio
+async def test_mock_chat_canonical_question_types_fallbacks():
+    """Requirement 3A: _mock_chat returns precise, useful fallback answers for the 4 canonical question types."""
+    from app.llm import LLMClient
+
+    llm = LLMClient()
+    canonical_queries = [
+        ("Why is the payment service experiencing a latency spike and slow p99?", "latency"),
+        ("What is causing the HTTP 500 error cluster and exceptions?", "error"),
+        ("Are there any active anomalies detected in our services?", "anomaly"),
+        ("What does the service dependency graph and topology look like?", "topology"),
+    ]
+
+    for question, q_type in canonical_queries:
+        messages = [{"role": "user", "content": question}]
+        content, tool_calls = await llm._mock_chat(messages, tools=None, force_answer=True)
+        assert content is not None
+        assert tool_calls is None
+
+        data = json.loads(content)
+        answer = AiAnswer(**data)
+
+        assert answer.insufficient_evidence is True
+        assert len(answer.evidence) == 0
+        assert len(answer.hypotheses) >= 1
+        assert len(answer.next_steps) >= 2
+        assert len(answer.summary) > 50
+
+        # Verify summary reflects the canonical diagnostic category
+        if q_type == "latency":
+            assert "Latency & Performance" in answer.summary
+        elif q_type == "error":
+            assert "Error Cluster" in answer.summary
+        elif q_type == "anomaly":
+            assert "Anomaly" in answer.summary
+        elif q_type == "topology":
+            assert "Topology" in answer.summary
+
+
+@pytest.mark.asyncio
+async def test_gemini_content_collision_consecutive_same_role_messages(monkeypatch):
+    """Requirement 3B: Gemini message formatting merges consecutive same-role turns to avoid collision."""
+    from app.llm import LLMClient
+
+    llm = LLMClient()
+    captured_payload = None
+
+    class MockAsyncClient:
+        async def __aenter__(self):
+            return self
+
+        async def __aexit__(self, *args):
+            pass
+
+        async def post(self, url, headers=None, json=None, timeout=None):
+            nonlocal captured_payload
+            captured_payload = json
+            import httpx
+            return httpx.Response(
+                status_code=200,
+                json={
+                    "candidates": [
+                        {
+                            "content": {
+                                "parts": [{"text": "{\"summary\": \"ok\", \"insufficient_evidence\": false, \"evidence\": [], \"hypotheses\": [], \"next_steps\": []}"}]
+                            }
+                        }
+                    ]
+                },
+                request=httpx.Request("POST", url),
+            )
+
+    monkeypatch.setattr("httpx.AsyncClient", MockAsyncClient)
+    llm.api_key = "fake-key"
+    llm.provider = "gemini"
+
+    # Feed conversation with consecutive same-role messages (tool results turn into role 'user')
+    messages = [
+        {"role": "system", "content": "System instruction."},
+        {"role": "user", "content": "Question turn 1"},
+        {"role": "assistant", "content": "Assistant response", "tool_calls": [
+            {"id": "call_1", "function": {"name": "get_service_stats", "arguments": "{}"}},
+            {"id": "call_2", "function": {"name": "find_slow_spans", "arguments": "{}"}},
+        ]},
+        {"role": "tool", "name": "get_service_stats", "content": "Result 1"},
+        {"role": "tool", "name": "find_slow_spans", "content": "Result 2"},
+    ]
+
+    content, calls = await llm._gemini_chat(messages, force_answer=True)
+    assert content is not None
+    assert captured_payload is not None
+
+    contents = captured_payload["contents"]
+    # Check strict alternation of roles: user -> model -> user -> model ...
+    for i in range(len(contents) - 1):
+        assert contents[i]["role"] != contents[i+1]["role"], (
+            f"Collision detected at index {i}: consecutive role '{contents[i]['role']}'"
+        )
+
+    # First role must be user
+    assert contents[0]["role"] == "user"
+
+
+@pytest.mark.asyncio
+async def test_agent_loop_immediate_limit_before_tool_results(monkeypatch):
+    """Requirement 4: When agent hits a limit before getting any tool results, yield a structured answer rather than cryptic error."""
+    from app.agent.loop import run_agent_loop
+    from app.config import get_settings
+
+    cfg = get_settings()
+    monkeypatch.setattr(cfg, "EOA_AGENT_MAX_TOOL_CALLS", 0)
+
+    events = []
+    async for ev in run_agent_loop(
+        question="Why are there so many 500 errors in the payment service?",
+        context=None,
+        org_id="test-org-limit",
+    ):
+        events.append(ev)
+
+    event_names = [e["event"] for e in events]
+    # Must NOT emit a cryptic 'error' event
+    assert "error" not in event_names
+    assert "answer" in event_names
+
+    # Find the final answer event
+    ans_event = next(e for e in reversed(events) if e["event"] == "answer")
+    ans_data = ans_event["data"]
+    answer = AiAnswer(**ans_data)
+
+    # Must be a structured informational answer with diagnostics
+    assert answer.insufficient_evidence is True
+    assert len(answer.summary) > 20
+    assert "Error Cluster" in answer.summary
+    assert len(answer.hypotheses) >= 1
+    assert len(answer.next_steps) >= 2
+
