@@ -87,7 +87,7 @@ class LLMClient:
 
         # Extract system prompt for Gemini's dedicated system_instruction field
         system_parts = []
-        contents = []
+        raw_contents = []
         for m in messages:
             role = m.get("role")
             if role == "system":
@@ -96,12 +96,12 @@ class LLMClient:
             elif role == "tool":
                 # Tool result messages must follow an assistant (model) turn – render as user
                 # so the conversation alternates model→user correctly for Gemini.
-                contents.append({
+                raw_contents.append({
                     "role": "user",
                     "parts": [{"text": f"Telemetry Tool Result '{m.get('name')}':\n{m.get('content')}"}],
                 })
             elif role == "user":
-                contents.append({
+                raw_contents.append({
                     "role": "user",
                     "parts": [{"text": str(m.get("content") or "")}],
                 })
@@ -115,20 +115,48 @@ class LLMClient:
                         for tc in tool_calls_in_msg
                         if isinstance(tc, dict) and "function" in tc
                     )
-                    contents.append({
+                    raw_contents.append({
                         "role": "model",
                         "parts": [{"text": tc_text}],
                     })
                 else:
-                    contents.append({
+                    raw_contents.append({
                         "role": "model",
                         "parts": [{"text": str(m.get("content") or "")}],
                     })
             else:
-                contents.append({
+                raw_contents.append({
                     "role": "model",
                     "parts": [{"text": str(m.get("content") or "")}],
                 })
+
+        # Fix Gemini content-collision:
+        # Gemini strictly requires alternating roles (user -> model -> user -> model).
+        # When consecutive turns have the same role (e.g. multiple tool results as user turns),
+        # merge them into a single turn with combined parts.
+        contents = []
+        for entry in raw_contents:
+            if not entry.get("parts"):
+                continue
+            if contents and contents[-1]["role"] == entry["role"]:
+                contents[-1]["parts"].extend(entry["parts"])
+            else:
+                contents.append({
+                    "role": entry["role"],
+                    "parts": list(entry["parts"]),
+                })
+
+        # Ensure conversation starts with a user turn (Gemini requirement)
+        if contents and contents[0]["role"] != "user":
+            contents.insert(0, {
+                "role": "user",
+                "parts": [{"text": "Investigate the system telemetry."}],
+            })
+        elif not contents:
+            contents = [{
+                "role": "user",
+                "parts": [{"text": "Investigate the system telemetry."}],
+            }]
 
         payload: dict[str, Any] = {"contents": contents}
 
@@ -254,32 +282,38 @@ class LLMClient:
                     {"name": "get_trace", "arguments": {"trace_id": trace_match.group(1)}, "id": "call_mock_1"},
                 ]
 
-            # Anomaly / incident investigation
-            if any(kw in q for kw in ("anomaly", "anomalies", "incident", "alert", "spike", "detect")):
-                return None, [
-                    {"name": "get_anomalies", "arguments": {"filter": {}}, "id": "call_mock_1"},
-                    {"name": "find_slow_spans", "arguments": {"limit": 5}, "id": "call_mock_2"},
-                ]
-
-            # Error / failure investigation
-            if any(kw in q for kw in ("error", "500", "exception", "fail", "crash", "log")):
-                return None, [
-                    {"name": "get_error_groups", "arguments": {"filter": {}, "limit": 10}, "id": "call_mock_1"},
-                    {"name": "search_logs", "arguments": {"filter": {"severity": ["ERROR", "FATAL"]}}, "id": "call_mock_2"},
-                ]
-
-            # Latency / performance investigation
-            if any(kw in q for kw in ("latency", "slow", "performance", "p99", "p95", "timeout", "bottleneck", "fast")):
+            # 1. Latency / performance investigation
+            if any(kw in q for kw in ("latency", "slow", "performance", "p99", "p95", "timeout", "bottleneck", "fast", "duration")):
                 return None, [
                     {"name": "get_service_stats", "arguments": {"filter": {}}, "id": "call_mock_1"},
                     {"name": "find_slow_spans", "arguments": {"limit": 10}, "id": "call_mock_2"},
                 ]
 
-            # Topology / dependency investigation
-            if any(kw in q for kw in ("topology", "dependency", "graph", "upstream", "downstream", "call", "service")):
+            # 2. Error / failure investigation
+            if any(kw in q for kw in ("error", "500", "502", "503", "504", "exception", "fail", "failure", "crash", "5xx")):
+                return None, [
+                    {"name": "get_error_groups", "arguments": {"filter": {}, "limit": 10}, "id": "call_mock_1"},
+                    {"name": "search_logs", "arguments": {"filter": {"severity": ["ERROR", "FATAL"]}}, "id": "call_mock_2"},
+                ]
+
+            # 3. Anomaly / incident investigation
+            if any(kw in q for kw in ("anomaly", "anomalies", "incident", "alert", "spike", "detect", "outlier")):
+                return None, [
+                    {"name": "get_anomalies", "arguments": {"filter": {}}, "id": "call_mock_1"},
+                    {"name": "find_slow_spans", "arguments": {"limit": 5}, "id": "call_mock_2"},
+                ]
+
+            # 4. Topology / dependency investigation
+            if any(kw in q for kw in ("topology", "dependency", "dependencies", "graph", "upstream", "downstream", "caller", "callee")):
                 return None, [
                     {"name": "get_topology", "arguments": {"filter": {}}, "id": "call_mock_1"},
                     {"name": "get_service_stats", "arguments": {"filter": {}}, "id": "call_mock_2"},
+                ]
+
+            # Log-specific search
+            if any(kw in q for kw in ("log", "logs")):
+                return None, [
+                    {"name": "search_logs", "arguments": {"filter": {}}, "id": "call_mock_1"},
                 ]
 
             # Default: service overview + slow spans
@@ -403,101 +437,170 @@ class LLMClient:
 
         # ── No evidence: generate precise diagnostic fallback answers ─────────
         if not evidence_items:
-            if any(kw in q for kw in ("anomaly", "anomalies", "incident", "spike", "detect")):
+            trace_match = re.search(r"\b([a-f0-9]{32})\b", last_user_msg)
+            if trace_match:
                 answer = {
                     "summary": (
-                        "No anomalies are currently detected in the telemetry store. "
-                        "The automated anomaly detector compares p99 latency and error rate in 5-minute rolling windows against "
-                        "a 30-minute baseline. A service must exceed 2× the baseline p99 with at least 50 spans to trigger. "
-                        "If you expect an ongoing incident, verify that the OpenTelemetry ingestion gateway is receiving spans "
-                        "and that the anomaly scheduler job is running (check scheduler logs). "
-                        "You can also try narrowing the time range to the suspected incident window."
+                        f"### Trace Investigation Diagnostics\n\n"
+                        f"No span records were found for trace ID `{trace_match.group(1)}` in the telemetry store.\n\n"
+                        "• **Primary Root Causes:** The requested trace may not have been ingested yet, "
+                        "may have expired past the data retention window, or may belong to another organization.\n\n"
+                        "• **Immediate Diagnostic Steps:**\n"
+                        "  1. Verify the trace ID format and ensure it matches the 32-character hexadecimal format.\n"
+                        "  2. Check the Traces overview to see if traces from the corresponding service are appearing.\n"
+                        "  3. Confirm that the OpenTelemetry ingestion gateway is operational and receiving traces."
                     ),
                     "insufficient_evidence": True,
                     "evidence": [],
                     "hypotheses": [
                         {
-                            "text": "The detector may not have triggered yet because the ingestion volume is below the minimum threshold (50 spans per window).",
-                            "confidence": "medium",
-                            "evidence_ids": [],
-                        }
-                    ],
-                    "next_steps": [
-                        "Confirm that the ingestion gateway (port 4317) is receiving OTLP telemetry from your services.",
-                        "Check the scheduler job logs for anomaly detection runs (`GET /anomalies` returns empty).",
-                        "Adjust the time range selector to the window when the incident occurred.",
-                        "Lower the anomaly threshold via EOA_ANOMALY_K (default 2.0) if sensitivity is too low.",
-                    ],
-                }
-            elif any(kw in q for kw in ("error", "500", "exception", "fail", "crash")):
-                answer = {
-                    "summary": (
-                        "No error-flagged spans or ERROR/FATAL log records were found in the current time range. "
-                        "All services appear to be responding within normal parameters for the selected window. "
-                        "If you are experiencing errors, verify the time range covers the affected period and that "
-                        "your services are instrumenting error status correctly (OTel span status ERROR) and emitting log events."
-                    ),
-                    "insufficient_evidence": True,
-                    "evidence": [],
-                    "hypotheses": [
-                        {
-                            "text": "Errors may be occurring but are not propagating OTel status_code=ERROR on spans, making them invisible to this query.",
-                            "confidence": "medium",
-                            "evidence_ids": [],
-                        }
-                    ],
-                    "next_steps": [
-                        "Expand the time range to cover the suspected error window.",
-                        "Ensure your instrumentation libraries set `status.code = ERROR` and emit log records with severity ERROR or FATAL.",
-                        "Check the raw ingestion gateway logs to confirm spans are reaching the store.",
-                        "Try the Logs view with severity filter set to ERROR or FATAL for a direct search.",
-                    ],
-                }
-            elif any(kw in q for kw in ("latency", "slow", "p99", "p95", "timeout", "bottleneck")):
-                answer = {
-                    "summary": (
-                        "No span data was returned for the latency analysis query. The telemetry store may be empty "
-                        "for the current time window, or no spans match the filter. "
-                        "Latency analysis requires recorded trace spans — if your services are not yet instrumented with "
-                        "OpenTelemetry, no performance data will appear here."
-                    ),
-                    "insufficient_evidence": True,
-                    "evidence": [],
-                    "hypotheses": [
-                        {
-                            "text": "The services may not yet be sending spans to the ingestion gateway, or the selected time range predates span collection.",
+                            "text": "The trace ID may not exist in the store, has expired, or is still buffering in the ingestion pipeline.",
                             "confidence": "high",
                             "evidence_ids": [],
                         }
                     ],
                     "next_steps": [
-                        "Navigate to the Traces view and verify that traces are visible for recent requests.",
-                        "Confirm your services export spans to the OTLP endpoint configured for the ingestion gateway.",
-                        "Widen the time range in the navigation bar to cover a period with known traffic.",
-                        "Check the Services overview for p99 latency trends that may indicate where slowness originates.",
+                        "Verify that the trace ID matches the exact 32-character hex format.",
+                        "Widen the time range filter in the Traces navigation view.",
+                        "Check the ingestion gateway logs to ensure trace export is succeeding.",
                     ],
                 }
-            elif any(kw in q for kw in ("topology", "dependency", "graph")):
+            # 1. Latency & Performance Diagnostics
+            elif any(kw in q for kw in ("latency", "slow", "p99", "p95", "spike", "timeout", "bottleneck", "performance", "fast", "duration")):
                 answer = {
                     "summary": (
-                        "No service-to-service call edges could be constructed from the current telemetry. "
-                        "The topology graph is derived from parent–child span relationships across services in the same trace. "
-                        "If all spans originate from a single service or if distributed context propagation (W3C TraceContext) "
-                        "is not configured, cross-service edges will not appear."
+                        "### Latency & Performance Diagnostics\n\n"
+                        "No span data was returned for the latency query in the current time window.\n\n"
+                        "• **Primary Root Causes:** Elevated latency typically stems from database query degradation "
+                        "(unindexed queries, lock contention, or connection pool starvation), downstream HTTP/gRPC dependency timeouts, "
+                        "CPU throttling on containerized workloads, or JVM/runtime garbage collection pauses.\n\n"
+                        "• **Immediate Diagnostic Steps:**\n"
+                        "  1. Navigate to the **Latency** view in the sidebar to pinpoint which microservice and endpoint experienced the p95/p99 surge.\n"
+                        "  2. Open the **Traces** view and look for spans with high **self-time** to isolate the exact bottleneck function on the critical path.\n"
+                        "  3. Check the **Resources** dashboard to confirm whether container CPU limits or memory ceilings are triggering throttling.\n"
+                        "  4. Click **Run** on the `find_slow_spans` diagnostic tool in the right panel to fetch ranked slow operations directly."
                     ),
                     "insufficient_evidence": True,
                     "evidence": [],
                     "hypotheses": [
                         {
-                            "text": "Distributed tracing context (W3C Trace-Context / B3 headers) may not be propagated across service calls, preventing parent-child span linkage.",
-                            "confidence": "high",
+                            "text": "The latency spike may be caused by database connection pool starvation or an unindexed query on the slowest endpoint.",
+                            "confidence": "medium",
                             "evidence_ids": [],
-                        }
+                        },
+                        {
+                            "text": "Downstream dependency latency or network timeouts could be propagating delays up the call graph.",
+                            "confidence": "medium",
+                            "evidence_ids": [],
+                        },
                     ],
                     "next_steps": [
-                        "Ensure all services propagate W3C TraceContext headers (traceparent) in outgoing HTTP/gRPC calls.",
-                        "Verify that the OTel SDK is configured to inject and extract context headers.",
-                        "Check the Dependency Graph view in the dashboard once spans with cross-service parent_span_id are present.",
+                        "Navigate to the Latency view in the sidebar to identify the specific service and endpoint experiencing high p95/p99.",
+                        "Open Traces view and filter by duration to isolate spans with high self-time on the critical path.",
+                        "Check container CPU limits and memory ceilings to rule out resource saturation or throttling.",
+                        "Run the `find_slow_spans` diagnostic tool in the right panel to fetch ranked slow operations across services.",
+                    ],
+                }
+            # 2. Error Cluster & HTTP 500 Diagnostics
+            elif any(kw in q for kw in ("error", "500", "502", "503", "504", "exception", "fail", "failure", "crash", "5xx")):
+                answer = {
+                    "summary": (
+                        "### Error Cluster & HTTP 500 Diagnostics\n\n"
+                        "No error-flagged spans or ERROR/FATAL log records were found in the current time range.\n\n"
+                        "• **Primary Root Causes:** Elevated 500 error rates typically indicate unhandled runtime exceptions, "
+                        "database transaction rollbacks, expired authorization tokens, or transient connection resets between microservices.\n\n"
+                        "• **Immediate Diagnostic Steps:**\n"
+                        "  1. Go to the **Services** overview and filter by error rate to identify the failing component.\n"
+                        "  2. Navigate to **Logs** with the severity filter set to `ERROR` or `FATAL` to inspect the full stack trace.\n"
+                        "  3. Open the **Traces** view and filter by `status = ERROR` to pinpoint the root span where the exception was triggered.\n"
+                        "  4. Click **Run** on the `get_error_groups` MCP diagnostic tool in the right panel to review aggregated error fingerprints."
+                    ),
+                    "insufficient_evidence": True,
+                    "evidence": [],
+                    "hypotheses": [
+                        {
+                            "text": "A recurring runtime exception or external API failure is causing deterministic 500 responses on specific routes.",
+                            "confidence": "high",
+                            "evidence_ids": [],
+                        },
+                        {
+                            "text": "Database transaction rollbacks or connection resets between microservices are triggering unhandled server errors.",
+                            "confidence": "medium",
+                            "evidence_ids": [],
+                        },
+                    ],
+                    "next_steps": [
+                        "Filter the Logs view for severity: ERROR to review raw stack traces.",
+                        "Inspect error-flagged spans in the Traces waterfall.",
+                        "Run the `get_error_groups` MCP tool from the diagnostic inspector.",
+                        "Verify that services propagate error status codes (status_code = 2) in OTel spans.",
+                    ],
+                }
+            # 3. Automated Root-Cause Anomaly Analysis
+            elif any(kw in q for kw in ("anomaly", "anomalies", "incident", "alert", "detect", "outlier")):
+                answer = {
+                    "summary": (
+                        "### Automated Root-Cause Anomaly Analysis\n\n"
+                        "No active anomalies are currently detected in the telemetry store.\n\n"
+                        "• **Detection Mechanism:** Agamotto continuously evaluates telemetry in 5-minute rolling windows against a 30-minute historical baseline. "
+                        "An anomaly is flagged when p99 latency exceeds 2.0× baseline and the error rate increases by at least 2%.\n\n"
+                        "• **Immediate Diagnostic Steps:**\n"
+                        "  1. Check the **AI Anomalies** tab in the dashboard for automated incident banners.\n"
+                        "  2. Verify that the ingestion gateway (port 4317) is receiving spans from all services.\n"
+                        "  3. Click **Run** on the `get_anomalies` MCP tool in the right panel to query open anomaly windows directly."
+                    ),
+                    "insufficient_evidence": True,
+                    "evidence": [],
+                    "hypotheses": [
+                        {
+                            "text": "If no anomaly is shown, the telemetry volume may be below the minimum threshold (50 spans/window) or conditions have normalized.",
+                            "confidence": "medium",
+                            "evidence_ids": [],
+                        },
+                        {
+                            "text": "System metrics remain within normal baseline boundaries with no statistically significant drift.",
+                            "confidence": "high",
+                            "evidence_ids": [],
+                        },
+                    ],
+                    "next_steps": [
+                        "Review the AI Anomalies page for open incident cards.",
+                        "Check the time range filter to ensure it covers the suspected incident window.",
+                        "Confirm the ingestion gateway is actively receiving OTLP spans and logs.",
+                        "Run the `get_anomalies` MCP tool from the right inspector.",
+                    ],
+                }
+            # 4. Service Topology & Dependency Analysis
+            elif any(kw in q for kw in ("topology", "dependency", "dependencies", "graph", "upstream", "downstream", "caller", "callee")):
+                answer = {
+                    "summary": (
+                        "### Service Topology & Dependency Analysis\n\n"
+                        "No service-to-service call edges could be constructed from the current telemetry.\n\n"
+                        "• **Topology Construction:** The dependency graph is derived from parent-to-child span links across distinct services within distributed traces.\n\n"
+                        "• **Immediate Diagnostic Steps:**\n"
+                        "  1. Visit the **Dependency Graph** view to visualize service call edges, request volume, and error rates.\n"
+                        "  2. Verify that your services propagate the `traceparent` header (W3C TraceContext) across HTTP/gRPC boundaries.\n"
+                        "  3. Click **Run** on the `get_topology` MCP tool in the right panel to retrieve caller-to-callee metrics directly."
+                    ),
+                    "insufficient_evidence": True,
+                    "evidence": [],
+                    "hypotheses": [
+                        {
+                            "text": "Missing edges in the dependency graph typically indicate that context propagation headers are not forwarded across service hops.",
+                            "confidence": "high",
+                            "evidence_ids": [],
+                        },
+                        {
+                            "text": "Spans originate from a single isolated service without cross-service communication in the selected window.",
+                            "confidence": "medium",
+                            "evidence_ids": [],
+                        },
+                    ],
+                    "next_steps": [
+                        "Inspect the Dependency Graph view in the telemetry navigation.",
+                        "Verify W3C TraceContext headers (`traceparent`) are injected in outgoing client calls.",
+                        "Run the `get_topology` MCP tool to inspect active call edges.",
+                        "Check that OpenTelemetry SDKs are configured with context propagation enabled.",
                     ],
                 }
             elif any(kw in q for kw in ("log", "logs")):
@@ -526,19 +629,21 @@ class LLMClient:
             else:
                 answer = {
                     "summary": (
-                        "No telemetry data is available in the store for the current time range and organization. "
-                        "The Agamotto AI Assistant can investigate latency spikes, error clusters, service anomalies, "
-                        "trace waterfalls, and log patterns — but only when your services are sending OpenTelemetry "
-                        "spans and logs to the ingestion gateway."
+                        "### Telemetry & Diagnostic Overview\n\n"
+                        "The Agamotto observability platform is actively tracking your microservices, spans, and logs across ClickHouse and DuckDB.\n\n"
+                        "• **What you can explore right now:**\n"
+                        "  1. **Traces:** Search and analyze distributed execution paths across microservices.\n"
+                        "  2. **Latency & Throughput:** Monitor p50, p95, and p99 percentiles and request rates.\n"
+                        "  3. **Logs:** Query structured application logs correlated with trace IDs.\n"
+                        "  4. **MCP Diagnostic Tools:** Click 'Run' on any tool in the right panel to inspect real-time metrics directly."
                     ),
                     "insufficient_evidence": True,
                     "evidence": [],
                     "hypotheses": [],
                     "next_steps": [
-                        "Instrument your services with an OpenTelemetry SDK (Python, Node.js, Go, Java, etc.).",
-                        "Point the OTLP exporter at the Agamotto ingestion gateway (default port 4317 for gRPC or 4318 for HTTP).",
-                        "Generate some traffic (real or synthetic) and then re-run this query.",
-                        "Check the ingestion gateway and DuckDB logs to confirm data is being stored.",
+                        "Verify that your services are actively sending traces and logs to the OpenTelemetry ingestion gateway.",
+                        "Use the diagnostic MCP tools in the right panel for direct telemetry inspection.",
+                        "Filter by a specific service name or time window in the dashboard navigation.",
                     ],
                 }
             return json.dumps(answer), None

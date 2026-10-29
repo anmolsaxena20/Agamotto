@@ -206,20 +206,29 @@ async def run_agent_loop(
         if not final_answer:
             elapsed = time.time() - start_time
             is_timeout = elapsed >= max_timeout or tool_call_count >= max_tool_calls
-            content_forced, _ = await llm.chat(messages, force_answer=True)
-            if content_forced:
-                final_answer = _try_parse_ai_answer(content_forced)
+            try:
+                content_forced, _ = await llm.chat(messages, force_answer=True)
+                if content_forced:
+                    final_answer = _try_parse_ai_answer(content_forced)
+            except Exception as e:
+                logger.warning("Forced answer synthesis failed: %s", e)
 
             if not final_answer:
-                final_answer = AiAnswer(
-                    summary="Investigation incomplete due to query execution limits.",
-                    insufficient_evidence=True,
-                    evidence=[],
-                    hypotheses=[],
-                    next_steps=["Refine the search time range and re-run investigation."],
+                # Agent hit a limit before getting tool results: yield structured informational answer
+                final_answer = _generate_fallback_answer_for_failure(
+                    question,
+                    "Execution limit reached before retrieving tool results."
                 )
             elif is_timeout and not final_answer.evidence:
                 final_answer.insufficient_evidence = True
+
+        # When the agent hits a limit before getting any tool results at all (e.g. API immediately fails),
+        # yield a structured informational answer rather than a cryptic error.
+        if tool_call_count == 0 and (not final_answer.evidence and not final_answer.hypotheses):
+            final_answer = _generate_fallback_answer_for_failure(
+                question,
+                "No telemetry tool results were retrieved."
+            )
 
         # Run Validator (Feature 19)
         final_answer = validate_ai_answer(final_answer, org_id)
@@ -244,6 +253,15 @@ async def run_agent_loop(
     except Exception as exc:
         logger.exception("Error during agent loop execution: %s", exc)
         fallback = _generate_fallback_answer_for_failure(question, str(exc))
+        yield {
+            "event": "evidence_validated",
+            "data": {
+                "verified_evidence_count": 0,
+                "insufficient_evidence": True,
+                "evidence": [],
+                "validation_stats": {"total": 0, "verified": 0, "hallucinated_removed": 0},
+            },
+        }
         yield {
             "event": "answer",
             "data": fallback.model_dump(mode="json"),

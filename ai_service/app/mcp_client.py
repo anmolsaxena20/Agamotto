@@ -21,6 +21,90 @@ from app.mcp.tools import TOOL_REGISTRY, ALL_TOOL_NAMES
 logger = logging.getLogger(__name__)
 
 
+FILTER_SCHEMA: Dict[str, Any] = {
+    "type": "object",
+    "description": "Optional telemetry filter",
+    "properties": {
+        "from": {"type": "string", "description": "ISO-8601 UTC start timestamp (e.g. '2026-10-28T00:00:00Z')"},
+        "to": {"type": "string", "description": "ISO-8601 UTC end timestamp"},
+        "services": {
+            "type": "array",
+            "items": {"type": "string"},
+            "description": "Limit to these service names",
+        },
+        "severity": {
+            "type": "array",
+            "items": {"type": "string"},
+            "description": "Log severity levels, e.g. ['ERROR', 'FATAL']",
+        },
+        "text": {"type": "string", "description": "Substring to search in log body or span name"},
+        "regex": {"type": "string", "description": "Regex pattern for log body or span name"},
+        "status": {"type": "string", "description": "Span status: 'OK', 'ERROR', or 'UNSET'"},
+        "limit": {"type": "integer", "description": "Max rows to return (1–50)", "default": 20},
+    },
+}
+
+TOOL_SCHEMAS: Dict[str, Dict[str, Any]] = {
+    "get_service_stats": {
+        "description": "Get request volume, error rate, and p50/p95/p99 latency per microservice. Use this first when asked about overall system health or latency.",
+        "parameters": {"type": "object", "properties": {"filter": FILTER_SCHEMA}},
+    },
+    "find_slow_spans": {
+        "description": "Find and rank the slowest operations by execution duration or self-time. Use when asked about latency spikes, slow endpoints, or bottlenecks.",
+        "parameters": {
+            "type": "object",
+            "properties": {
+                "filter": FILTER_SCHEMA,
+                "limit": {"type": "integer", "description": "Number of spans to return (1–50)", "default": 10},
+            },
+        },
+    },
+    "get_error_groups": {
+        "description": "Get grouped error fingerprints with occurrence counts, timestamps, and sample trace IDs. Use when asked about errors, exceptions, or 500s.",
+        "parameters": {
+            "type": "object",
+            "properties": {
+                "filter": FILTER_SCHEMA,
+                "limit": {"type": "integer", "description": "Number of error groups to return (1–50)", "default": 10},
+            },
+        },
+    },
+    "get_trace": {
+        "description": "Fetch a full distributed trace tree with depth, self-time, and critical path. Use when given a specific trace_id to investigate.",
+        "parameters": {
+            "type": "object",
+            "properties": {
+                "trace_id": {"type": "string", "description": "The 32-character hex trace ID to fetch"},
+            },
+            "required": ["trace_id"],
+        },
+    },
+    "search_logs": {
+        "description": "Search log records by service, severity, text, or regex (strictly capped at 50 rows). Use when asked about log messages, error logs, or specific events.",
+        "parameters": {"type": "object", "properties": {"filter": FILTER_SCHEMA}},
+    },
+    "compare_traces": {
+        "description": "Compare a trace against a baseline, identifying span duration deltas, added spans, and missing spans. Use when investigating regression or comparing before/after.",
+        "parameters": {
+            "type": "object",
+            "properties": {
+                "trace_id": {"type": "string", "description": "The trace ID to compare"},
+                "baseline_trace_id": {"type": "string", "description": "Optional baseline trace ID (auto-selected if omitted)"},
+            },
+            "required": ["trace_id"],
+        },
+    },
+    "get_topology": {
+        "description": "Retrieve the microservice dependency graph with call volume, p95 latency, and error rate per edge. Use when asked about service dependencies or which services call each other.",
+        "parameters": {"type": "object", "properties": {"filter": FILTER_SCHEMA}},
+    },
+    "get_anomalies": {
+        "description": "Retrieve statistically detected anomaly windows with ranked suspect spans. Use when asked about anomalies, incidents, or automated detections.",
+        "parameters": {"type": "object", "properties": {"filter": FILTER_SCHEMA}},
+    },
+}
+
+
 class McpClient:
     """Client for executing MCP telemetry tools on behalf of the AI Agent."""
 
@@ -39,96 +123,11 @@ class McpClient:
 
     def get_tool_definitions(self) -> List[Dict[str, Any]]:
         """Return tool definitions formatted for tool-calling LLMs (OpenAI function-calling format)."""
-        # Shared filter schema used by filter-based tools
-        filter_schema = {
-            "type": "object",
-            "description": "Optional telemetry filter",
-            "properties": {
-                "from": {"type": "string", "description": "ISO-8601 UTC start timestamp (e.g. '2026-10-28T00:00:00Z')"},
-                "to": {"type": "string", "description": "ISO-8601 UTC end timestamp"},
-                "services": {
-                    "type": "array",
-                    "items": {"type": "string"},
-                    "description": "Limit to these service names",
-                },
-                "severity": {
-                    "type": "array",
-                    "items": {"type": "string"},
-                    "description": "Log severity levels, e.g. ['ERROR', 'FATAL']",
-                },
-                "text": {"type": "string", "description": "Substring to search in log body or span name"},
-                "regex": {"type": "string", "description": "Regex pattern for log body or span name"},
-                "status": {"type": "string", "description": "Span status: 'OK', 'ERROR', or 'UNSET'"},
-                "limit": {"type": "integer", "description": "Max rows to return (1–50)", "default": 20},
-            },
-        }
-
-        # Per-tool schema definitions
-        tool_schemas: Dict[str, Dict[str, Any]] = {
-            "get_service_stats": {
-                "description": "Get request volume, error rate, and p50/p95/p99 latency per microservice. Use this first when asked about overall system health or latency.",
-                "parameters": {"type": "object", "properties": {"filter": filter_schema}},
-            },
-            "find_slow_spans": {
-                "description": "Find and rank the slowest operations by execution duration or self-time. Use when asked about latency spikes, slow endpoints, or bottlenecks.",
-                "parameters": {
-                    "type": "object",
-                    "properties": {
-                        "filter": filter_schema,
-                        "limit": {"type": "integer", "description": "Number of spans to return (1–50)", "default": 10},
-                    },
-                },
-            },
-            "get_error_groups": {
-                "description": "Get grouped error fingerprints with occurrence counts, timestamps, and sample trace IDs. Use when asked about errors, exceptions, or 500s.",
-                "parameters": {
-                    "type": "object",
-                    "properties": {
-                        "filter": filter_schema,
-                        "limit": {"type": "integer", "description": "Number of error groups to return (1–50)", "default": 10},
-                    },
-                },
-            },
-            "get_trace": {
-                "description": "Fetch a full distributed trace tree with depth, self-time, and critical path. Use when given a specific trace_id to investigate.",
-                "parameters": {
-                    "type": "object",
-                    "properties": {
-                        "trace_id": {"type": "string", "description": "The 32-character hex trace ID to fetch"},
-                    },
-                    "required": ["trace_id"],
-                },
-            },
-            "search_logs": {
-                "description": "Search log records by service, severity, text, or regex (strictly capped at 50 rows). Use when asked about log messages, error logs, or specific events.",
-                "parameters": {"type": "object", "properties": {"filter": filter_schema}},
-            },
-            "compare_traces": {
-                "description": "Compare a trace against a baseline, identifying span duration deltas, added spans, and missing spans. Use when investigating regression or comparing before/after.",
-                "parameters": {
-                    "type": "object",
-                    "properties": {
-                        "trace_id": {"type": "string", "description": "The trace ID to compare"},
-                        "baseline_trace_id": {"type": "string", "description": "Optional baseline trace ID (auto-selected if omitted)"},
-                    },
-                    "required": ["trace_id"],
-                },
-            },
-            "get_topology": {
-                "description": "Retrieve the microservice dependency graph with call volume, p95 latency, and error rate per edge. Use when asked about service dependencies or which services call each other.",
-                "parameters": {"type": "object", "properties": {"filter": filter_schema}},
-            },
-            "get_anomalies": {
-                "description": "Retrieve statistically detected anomaly windows with ranked suspect spans. Use when asked about anomalies, incidents, or automated detections.",
-                "parameters": {"type": "object", "properties": {"filter": filter_schema}},
-            },
-        }
-
         definitions = []
         for name, meta in TOOL_REGISTRY.items():
             if is_tool_disabled(name):
                 continue
-            schema_override = tool_schemas.get(name, {})
+            schema_override = TOOL_SCHEMAS.get(name, {})
             definitions.append({
                 "type": "function",
                 "function": {
@@ -136,7 +135,7 @@ class McpClient:
                     "description": schema_override.get("description", meta["description"]),
                     "parameters": schema_override.get("parameters", {
                         "type": "object",
-                        "properties": {"filter": filter_schema},
+                        "properties": {"filter": FILTER_SCHEMA},
                     }),
                 },
             })

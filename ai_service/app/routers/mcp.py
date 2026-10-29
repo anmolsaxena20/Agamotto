@@ -33,6 +33,8 @@ logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/mcp", tags=["mcp"])
 
 
+from app.mcp_client import TOOL_SCHEMAS
+
 @router.get("/tools", response_model=List[ToolInfo])
 async def list_mcp_tools(auth: dict = Depends(get_current_org)):
     """
@@ -41,19 +43,15 @@ async def list_mcp_tools(auth: dict = Depends(get_current_org)):
     """
     tools_list: List[ToolInfo] = []
     for name, item in TOOL_REGISTRY.items():
+        schema_info = TOOL_SCHEMAS.get(name, {})
         tools_list.append(
             ToolInfo(
                 name=name,
-                description=item["description"],
-                input_schema={
+                description=schema_info.get("description", item["description"]),
+                input_schema=schema_info.get("parameters", {
                     "type": "object",
-                    "properties": {
-                        "filter": {"$ref": "#/components/schemas/TelemetryFilter"},
-                        "limit": {"type": "integer", "default": 10},
-                        "trace_id": {"type": "string"},
-                        "baseline_trace_id": {"type": "string"},
-                    },
-                },
+                    "properties": {},
+                }),
                 enabled=not is_tool_disabled(name),
             )
         )
