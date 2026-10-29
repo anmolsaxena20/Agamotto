@@ -258,6 +258,230 @@ def sync_clickhouse_to_duckdb(
     return row_count
 
 
+def sync_telemetry_from_clickhouse(
+    conn: duckdb.DuckDBPyConnection | None = None,
+    org_id: str | None = None,
+    limit: int = 50000,
+) -> dict[str, int]:
+    """
+    Synchronize telemetry facts (spans and logs) from ClickHouse into DuckDB.
+    Ensures that DuckDB has full access to all ClickHouse telemetry for AI assistant
+    MCP tools and the background anomaly detector.
+    """
+    import logging
+    log = logging.getLogger(__name__)
+    if conn is None:
+        conn = get_db()
+
+    stats = {"spans_synced": 0, "logs_synced": 0}
+
+    # 1. Sync Spans from ClickHouse
+    try:
+        from .clickhouse import get_ch_client
+        ch_client = get_ch_client()
+
+        spans_source = None
+        try:
+            res = ch_client.query("EXISTS TABLE agamotto_telemetry.canonical_spans")
+            if res.result_rows and res.result_rows[0][0] == 1:
+                spans_source = "canonical_spans"
+        except Exception:
+            pass
+
+        if not spans_source:
+            try:
+                res = ch_client.query("EXISTS TABLE agamotto_telemetry.trace_spans")
+                if res.result_rows and res.result_rows[0][0] == 1:
+                    spans_source = "trace_spans"
+            except Exception:
+                pass
+
+        if spans_source == "canonical_spans":
+            where_sql = f"WHERE org_id = '{org_id}'" if org_id else ""
+            sql = f"""
+                SELECT
+                    org_id,
+                    trace_id,
+                    span_id,
+                    parent_span_id,
+                    service_name,
+                    span_name,
+                    span_kind,
+                    start_time_ns,
+                    start_ts,
+                    duration_ns,
+                    status_code,
+                    status_message,
+                    http_method,
+                    http_route,
+                    http_status,
+                    is_error,
+                    error_fingerprint,
+                    attributes,
+                    resource_attributes,
+                    ingested_at
+                FROM agamotto_telemetry.canonical_spans
+                {where_sql}
+                ORDER BY start_ts DESC
+                LIMIT {limit}
+            """
+            arrow_spans = ch_client.query_arrow(sql)
+            if arrow_spans.num_rows > 0:
+                conn.register("_tmp_ch_spans", arrow_spans)
+                try:
+                    conn.execute("""
+                        INSERT OR REPLACE INTO spans
+                        SELECT * FROM _tmp_ch_spans
+                    """)
+                    stats["spans_synced"] = arrow_spans.num_rows
+                finally:
+                    try:
+                        conn.unregister("_tmp_ch_spans")
+                    except Exception:
+                        pass
+        elif spans_source == "trace_spans":
+            where_sql = f"WHERE toString(organization_id) = '{org_id}' OR organization_id = toUUIDOrDefault('{org_id}', toUUID('00000000-0000-0000-0000-000000000000'))" if org_id else ""
+            sql = f"""
+                SELECT
+                    toString(organization_id) AS org_id,
+                    toString(trace_id) AS trace_id,
+                    toString(span_id) AS span_id,
+                    toString(parent_span_id) AS parent_span_id,
+                    service_name,
+                    name AS span_name,
+                    CASE kind WHEN 1 THEN 'INTERNAL' WHEN 2 THEN 'SERVER' WHEN 3 THEN 'CLIENT' WHEN 4 THEN 'PRODUCER' WHEN 5 THEN 'CONSUMER' ELSE 'INTERNAL' END AS span_kind,
+                    toUnixTimestamp64Nano(start_time) AS start_time_ns,
+                    toDateTime64(start_time, 6) AS start_ts,
+                    duration_ns,
+                    CASE status_code WHEN 2 THEN 'ERROR' WHEN 1 THEN 'OK' ELSE 'UNSET' END AS status_code,
+                    '' AS status_message,
+                    '' AS http_method,
+                    '' AS http_route,
+                    toNullable(toInt16(0)) AS http_status,
+                    (status_code = 2) AS is_error,
+                    '' AS error_fingerprint,
+                    '{{}}' AS attributes,
+                    '{{}}' AS resource_attributes,
+                    now64(3) AS ingested_at
+                FROM agamotto_telemetry.trace_spans
+                {where_sql}
+                ORDER BY start_time DESC
+                LIMIT {limit}
+            """
+            arrow_spans = ch_client.query_arrow(sql)
+            if arrow_spans.num_rows > 0:
+                conn.register("_tmp_ch_spans", arrow_spans)
+                try:
+                    conn.execute("""
+                        INSERT OR REPLACE INTO spans
+                        SELECT * FROM _tmp_ch_spans
+                    """)
+                    stats["spans_synced"] = arrow_spans.num_rows
+                finally:
+                    try:
+                        conn.unregister("_tmp_ch_spans")
+                    except Exception:
+                        pass
+    except Exception as e:
+        log.warning("Could not sync spans from ClickHouse to DuckDB: %s", e)
+
+    # 2. Sync Logs from ClickHouse
+    try:
+        from .clickhouse import get_ch_client
+        ch_client = get_ch_client()
+
+        logs_source = None
+        try:
+            res = ch_client.query("EXISTS TABLE agamotto_telemetry.canonical_logs")
+            if res.result_rows and res.result_rows[0][0] == 1:
+                logs_source = "canonical_logs"
+        except Exception:
+            pass
+
+        if not logs_source:
+            try:
+                res = ch_client.query("EXISTS TABLE agamotto_telemetry.telemetry_logs")
+                if res.result_rows and res.result_rows[0][0] == 1:
+                    logs_source = "telemetry_logs"
+            except Exception:
+                pass
+
+        if logs_source == "canonical_logs":
+            where_sql = f"WHERE org_id = '{org_id}'" if org_id else ""
+            sql = f"""
+                SELECT
+                    org_id,
+                    log_id,
+                    time_ns,
+                    ts,
+                    trace_id,
+                    span_id,
+                    service_name,
+                    severity_text,
+                    severity_number,
+                    body,
+                    error_fingerprint,
+                    attributes
+                FROM agamotto_telemetry.canonical_logs
+                {where_sql}
+                ORDER BY ts DESC
+                LIMIT {limit}
+            """
+            arrow_logs = ch_client.query_arrow(sql)
+            if arrow_logs.num_rows > 0:
+                conn.register("_tmp_ch_logs", arrow_logs)
+                try:
+                    conn.execute("""
+                        INSERT OR REPLACE INTO logs
+                        SELECT * FROM _tmp_ch_logs
+                    """)
+                    stats["logs_synced"] = arrow_logs.num_rows
+                finally:
+                    try:
+                        conn.unregister("_tmp_ch_logs")
+                    except Exception:
+                        pass
+        elif logs_source == "telemetry_logs":
+            where_sql = f"WHERE toString(organization_id) = '{org_id}' OR organization_id = toUUIDOrDefault('{org_id}', toUUID('00000000-0000-0000-0000-000000000000'))" if org_id else ""
+            sql = f"""
+                SELECT
+                    toString(organization_id) AS org_id,
+                    toString(coalesce(span_id, generateUUIDv4())) AS log_id,
+                    toUnixTimestamp64Nano(time) AS time_ns,
+                    toDateTime64(time, 6) AS ts,
+                    toString(trace_id) AS trace_id,
+                    toString(span_id) AS span_id,
+                    service_name,
+                    severity_text,
+                    toNullable(toInt16(severity_number)) AS severity_number,
+                    body,
+                    '' AS error_fingerprint,
+                    attributes_json AS attributes
+                FROM agamotto_telemetry.telemetry_logs
+                {where_sql}
+                ORDER BY time DESC
+                LIMIT {limit}
+            """
+            arrow_logs = ch_client.query_arrow(sql)
+            if arrow_logs.num_rows > 0:
+                conn.register("_tmp_ch_logs", arrow_logs)
+                try:
+                    conn.execute("""
+                        INSERT OR REPLACE INTO logs
+                        SELECT * FROM _tmp_ch_logs
+                    """)
+                    stats["logs_synced"] = arrow_logs.num_rows
+                finally:
+                    try:
+                        conn.unregister("_tmp_ch_logs")
+                    except Exception:
+                        pass
+    except Exception as e:
+        log.warning("Could not sync logs from ClickHouse to DuckDB: %s", e)
+
+    return stats
+
+
 def verify_spans_in_duckdb(
     conn: duckdb.DuckDBPyConnection,
     org_id: str,

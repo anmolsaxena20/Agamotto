@@ -39,6 +39,13 @@ async def run_scheduler() -> None:
         try:
             await asyncio.sleep(interval)
             conn = get_db()
+            # Sync fresh telemetry from ClickHouse to ensure detector has latest spans
+            try:
+                from ..database import sync_telemetry_from_clickhouse
+                await asyncio.to_thread(sync_telemetry_from_clickhouse, conn)
+            except Exception as sync_err:
+                logger.debug("Scheduler ClickHouse sync note: %s", sync_err)
+
             result = await asyncio.to_thread(run_detection_cycle, conn)
             logger.info("Detector cycle: %s", result)
         except asyncio.CancelledError:

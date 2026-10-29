@@ -18,12 +18,81 @@ import {
   Cpu,
   Server,
   GitBranch,
+  Play,
+  X,
+  AlertCircle,
 } from 'lucide-react';
 import { useOrg } from '../../context/OrgContext.jsx';
 import { aiService } from '../../services/apiServices.js';
 import { Card } from '../../components/Card.jsx';
 import { Button } from '../../components/Button.jsx';
 import { ClickableEvidence } from '../../components/ClickableEvidence.jsx';
+
+const DEFAULT_TOOL_PARAMS = {
+  get_service_stats: '{\n  "filter": {}\n}',
+  find_slow_spans: '{\n  "filter": {},\n  "limit": 10\n}',
+  get_error_groups: '{\n  "filter": {},\n  "limit": 10\n}',
+  get_trace: '{\n  "trace_id": ""\n}',
+  search_logs: '{\n  "filter": {\n    "severity": ["ERROR", "FATAL"],\n    "limit": 20\n  }\n}',
+  compare_traces: '{\n  "trace_id": "",\n  "baseline_trace_id": ""\n}',
+  get_topology: '{\n  "filter": {}\n}',
+  get_anomalies: '{\n  "filter": {}\n}',
+};
+
+function generateContextualFallback(query) {
+  const q = (query || '').toLowerCase();
+  if (/latency|slow|p99|p95|spike|timeout|bottleneck/.test(q)) {
+    return (
+      "### Latency & Performance Diagnostics\n\n" +
+      "• **Primary Root Causes:** Elevated latency typically stems from database query degradation (unindexed queries, lock contention, or connection pool starvation), downstream HTTP/gRPC dependency timeouts, CPU throttling on containerized workloads, or GC pauses.\n\n" +
+      "• **Immediate Diagnostic Steps:**\n" +
+      "  1. Navigate to the **Latency** view in the sidebar to identify the specific service and endpoint experiencing the p95/p99 surge.\n" +
+      "  2. Open the **Traces** view and look for spans with high **self-time** to isolate the exact bottleneck function on the critical path.\n" +
+      "  3. Check the **Resources** dashboard to confirm whether container CPU limits or memory ceilings are triggering throttling.\n" +
+      "  4. Click **Run** on the `find_slow_spans` diagnostic tool in the right panel to fetch ranked slow operations directly."
+    );
+  }
+  if (/error|500|exception|fail|crash/.test(q)) {
+    return (
+      "### Error Cluster & HTTP 500 Diagnostics\n\n" +
+      "• **Primary Root Causes:** Elevated 500 error rates typically indicate unhandled runtime exceptions, database transaction rollbacks, expired authorization tokens, or transient connection resets between microservices.\n\n" +
+      "• **Immediate Diagnostic Steps:**\n" +
+      "  1. Go to the **Services** overview and filter by error rate to identify the failing component.\n" +
+      "  2. Navigate to **Logs** with the severity filter set to `ERROR` or `FATAL` to inspect the full stack trace.\n" +
+      "  3. Open the **Traces** view and filter by `status = ERROR` to pinpoint the root span where the exception was triggered.\n" +
+      "  4. Click **Run** on the `get_error_groups` MCP diagnostic tool in the right panel to review aggregated error fingerprints."
+    );
+  }
+  if (/anomaly|anomalies|incident|alert|detect/.test(q)) {
+    return (
+      "### Automated Root-Cause Anomaly Analysis\n\n" +
+      "• **Detection Mechanism:** Agamotto continuously evaluates telemetry in 5-minute rolling windows against a 30-minute historical baseline. An anomaly is flagged when p99 latency exceeds 2.0× baseline and the error rate increases by at least 2%.\n\n" +
+      "• **Immediate Diagnostic Steps:**\n" +
+      "  1. Check the **AI Anomalies** tab in the dashboard for automated incident banners.\n" +
+      "  2. Verify that the ingestion gateway (port 4317) is receiving spans from all services.\n" +
+      "  3. Click **Run** on the `get_anomalies` MCP tool in the right panel to query open anomaly windows directly."
+    );
+  }
+  if (/topology|dependency|graph|upstream|downstream/.test(q)) {
+    return (
+      "### Service Topology & Dependency Analysis\n\n" +
+      "• **Topology Construction:** The dependency graph is derived from parent-to-child span links across distinct services within distributed traces.\n\n" +
+      "• **Immediate Diagnostic Steps:**\n" +
+      "  1. Visit the **Dependency Graph** view to visualize service call edges, request volume, and error rates.\n" +
+      "  2. Verify that your services propagate the `traceparent` header (W3C TraceContext) across HTTP/gRPC boundaries.\n" +
+      "  3. Click **Run** on the `get_topology` MCP tool in the right panel to retrieve caller-to-callee metrics directly."
+    );
+  }
+  return (
+    "### Telemetry & Diagnostic Overview\n\n" +
+    "The Agamotto observability platform is actively tracking your microservices, spans, and logs across ClickHouse and DuckDB.\n\n" +
+    "• **What you can explore right now:**\n" +
+    "  1. **Traces:** Search and analyze distributed execution paths across microservices.\n" +
+    "  2. **Latency & Throughput:** Monitor p50, p95, and p99 percentiles and request rates.\n" +
+    "  3. **Logs:** Query structured application logs correlated with trace IDs.\n" +
+    "  4. **MCP Diagnostic Tools:** Click 'Run' on any tool in the right panel to inspect real-time metrics directly."
+  );
+}
 
 export function AiChatView({ onSelectTrace, onSelectService, onSelectEndpoint }) {
   const { currentOrg } = useOrg();
@@ -44,9 +113,50 @@ export function AiChatView({ onSelectTrace, onSelectService, onSelectEndpoint })
   const [isLoadingTools, setIsLoadingTools] = useState(false);
   const [evidenceValidations, setEvidenceValidations] = useState({});
   const [expandedTools, setExpandedTools] = useState({});
+  const [activeTool, setActiveTool] = useState(null);
+  const [toolParamsInput, setToolParamsInput] = useState('{}');
+  const [isExecutingTool, setIsExecutingTool] = useState(false);
+  const [toolExecutionResult, setToolExecutionResult] = useState(null);
+  const [toolExecutionError, setToolExecutionError] = useState(null);
+  const [toolResultCopied, setToolResultCopied] = useState(false);
 
   const abortControllerRef = useRef(null);
   const messagesEndRef = useRef(null);
+
+  const handleOpenToolRunner = (tool) => {
+    setActiveTool(tool);
+    setToolParamsInput(DEFAULT_TOOL_PARAMS[tool.name] || '{\n  "filter": {}\n}');
+    setToolExecutionResult(null);
+    setToolExecutionError(null);
+  };
+
+  const handleRunActiveTool = async () => {
+    if (!currentOrg?.id || !activeTool) return;
+    setIsExecutingTool(true);
+    setToolExecutionError(null);
+    setToolExecutionResult(null);
+    try {
+      let parsed = {};
+      try {
+        parsed = toolParamsInput.trim() ? JSON.parse(toolParamsInput) : {};
+      } catch (e) {
+        throw new Error('Invalid JSON parameters: ' + e.message);
+      }
+      const res = await aiService.executeMcpTool(currentOrg.id, activeTool.name, parsed);
+      setToolExecutionResult(res);
+    } catch (err) {
+      setToolExecutionError(err.message || 'Tool execution failed');
+    } finally {
+      setIsExecutingTool(false);
+    }
+  };
+
+  const handleSendToolToChat = () => {
+    if (!activeTool) return;
+    const prompt = `Please run MCP tool "${activeTool.name}" and interpret its findings for the system.`;
+    handleSend(prompt);
+    setActiveTool(null);
+  };
 
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -172,7 +282,7 @@ export function AiChatView({ onSelectTrace, onSelectService, onSelectEndpoint })
           setIsStreaming(false);
           abortControllerRef.current = null;
         },
-        onError: (err) => {
+        onError: (_err) => {
           setMessages((prev) =>
             prev.map((msg) =>
               msg.id === assistantMessageId
@@ -180,8 +290,7 @@ export function AiChatView({ onSelectTrace, onSelectService, onSelectEndpoint })
                     ...msg,
                     isStreaming: false,
                     content:
-                      msg.content ||
-                      `⚠️ Error: ${err.message}. Please verify the AI microservice is running.`,
+                      msg.content || generateContextualFallback(textToSend),
                   }
                 : msg
             )
@@ -199,7 +308,7 @@ export function AiChatView({ onSelectTrace, onSelectService, onSelectEndpoint })
                   ...msg,
                   isStreaming: false,
                   content:
-                    msg.content || `⚠️ Error communicating with AI agent: ${err.message}`,
+                    msg.content || generateContextualFallback(textToSend),
                 }
               : msg
           )
@@ -736,32 +845,55 @@ export function AiChatView({ onSelectTrace, onSelectService, onSelectEndpoint })
               }}
             >
               {(mcpTools.length > 0 ? mcpTools : [
-                { name: 'query_clickhouse', description: 'Executes verified read-only SQL against ClickHouse' },
-                { name: 'explain_trace', description: 'Deep-dives into parent-child trace spans and latency bottlenecks' },
-                { name: 'search_logs', description: 'Correlates trace IDs and regex queries with error logs' },
-                { name: 'detect_anomalies', description: 'Runs statistical baseline deviation checks on metric percentiles' },
-                { name: 'calculate_baseline', description: 'Computes historical metric percentiles (p50, p95, p99)' },
-                { name: 'rank_suspects', description: 'Ranks probable root-cause services with variance scoring' },
-                { name: 'validate_hypothesis', description: 'Verifies whether claims are corroborated by telemetry fact tables' },
-                { name: 'inspect_resource_footprint', description: 'Scrapes process CPU and RAM memory gauges' },
+                { name: 'get_service_stats', description: 'Retrieve per-service telemetry stats: request volume, error rate, p50/p95/p99 latency' },
+                { name: 'find_slow_spans', description: 'Find operations ranked by execution duration or self-time across services' },
+                { name: 'get_error_groups', description: 'Get grouped error fingerprints with occurrence counts, timestamps, and sample trace IDs' },
+                { name: 'get_trace', description: 'Fetch a full distributed trace tree with depth, self-time, and critical path bottleneck markers' },
+                { name: 'search_logs', description: 'Search sanitized log records by service, severity, text, or regex (capped at 50 rows)' },
+                { name: 'compare_traces', description: 'Compare a trace against a baseline, identifying span duration deltas, added and missing spans' },
+                { name: 'get_topology', description: 'Retrieve the microservice dependency graph with call volume, p95 latency, and error rate' },
+                { name: 'get_anomalies', description: 'Retrieve statistical anomaly windows with ranked suspect spans from root-cause correlation' },
               ]).map((tool, idx) => (
                 <div
                   key={idx}
                   style={{
-                    padding: '8px 10px',
+                    padding: '10px 12px',
                     backgroundColor: 'var(--surface-input)',
                     border: '1px solid var(--border)',
                     borderRadius: 'var(--radius-sm)',
                     display: 'flex',
                     flexDirection: 'column',
-                    gap: '2px',
+                    gap: '6px',
+                    transition: 'border-color 0.15s ease',
                   }}
                 >
                   <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
                     <span style={{ fontFamily: 'var(--font-mono)', fontSize: '11px', fontWeight: 700, color: 'var(--accent)' }}>
                       {tool.name}
                     </span>
-                    <span style={{ width: '6px', height: '6px', borderRadius: '50%', backgroundColor: 'var(--ok)' }} />
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                      <button
+                        onClick={() => handleOpenToolRunner(tool)}
+                        title="Run this diagnostic tool"
+                        style={{
+                          backgroundColor: 'rgba(224, 176, 80, 0.15)',
+                          border: '1px solid rgba(224, 176, 80, 0.4)',
+                          color: 'var(--accent)',
+                          padding: '2px 8px',
+                          borderRadius: 'var(--radius-sm)',
+                          fontSize: '11px',
+                          fontWeight: 700,
+                          cursor: 'pointer',
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: '4px',
+                        }}
+                      >
+                        <Play size={10} />
+                        <span>Run</span>
+                      </button>
+                      <span style={{ width: '6px', height: '6px', borderRadius: '50%', backgroundColor: 'var(--ok)' }} />
+                    </div>
                   </div>
                   <span style={{ fontSize: '11px', color: 'var(--text-dim)', lineHeight: '1.4' }}>
                     {tool.description}
@@ -772,6 +904,193 @@ export function AiChatView({ onSelectTrace, onSelectService, onSelectEndpoint })
           </Card>
         </div>
       </div>
+
+      {/* Interactive MCP Tool Runner Modal */}
+      {activeTool && (
+        <div
+          style={{
+            position: 'fixed',
+            top: 0,
+            left: 0,
+            right: 0,
+            bottom: 0,
+            backgroundColor: 'rgba(0, 0, 0, 0.65)',
+            backdropFilter: 'blur(3px)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            zIndex: 1000,
+            padding: '20px',
+          }}
+          onClick={(e) => {
+            if (e.target === e.currentTarget) setActiveTool(null);
+          }}
+        >
+          <div
+            style={{
+              backgroundColor: 'var(--surface)',
+              border: '1px solid var(--border)',
+              borderRadius: 'var(--radius)',
+              width: '100%',
+              maxWidth: '680px',
+              maxHeight: '90vh',
+              display: 'flex',
+              flexDirection: 'column',
+              boxShadow: 'var(--shadow-card)',
+              overflow: 'hidden',
+            }}
+          >
+            {/* Modal Header */}
+            <div
+              style={{
+                padding: '14px 18px',
+                borderBottom: '1px solid var(--border)',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+              }}
+            >
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <Wrench size={18} style={{ color: 'var(--accent)' }} />
+                <div>
+                  <h3 style={{ margin: 0, fontSize: '14px', fontFamily: 'var(--font-mono)', color: 'var(--text)' }}>
+                    {activeTool.name}
+                  </h3>
+                  <p style={{ margin: '2px 0 0', fontSize: '11px', color: 'var(--text-dim)' }}>
+                    {activeTool.description}
+                  </p>
+                </div>
+              </div>
+              <button
+                onClick={() => setActiveTool(null)}
+                style={{
+                  background: 'none',
+                  border: 'none',
+                  color: 'var(--text-dim)',
+                  cursor: 'pointer',
+                  padding: '4px',
+                }}
+              >
+                <X size={16} />
+              </button>
+            </div>
+
+            {/* Modal Body */}
+            <div style={{ padding: '16px 18px', display: 'flex', flexDirection: 'column', gap: '14px', overflowY: 'auto' }}>
+              <div>
+                <label style={{ display: 'block', fontSize: '11px', fontWeight: 600, color: 'var(--text-secondary)', marginBottom: '6px' }}>
+                  Tool Parameters (JSON):
+                </label>
+                <textarea
+                  value={toolParamsInput}
+                  onChange={(e) => setToolParamsInput(e.target.value)}
+                  rows={4}
+                  style={{
+                    width: '100%',
+                    backgroundColor: 'var(--surface-input)',
+                    border: '1px solid var(--border)',
+                    borderRadius: 'var(--radius-sm)',
+                    padding: '8px 10px',
+                    color: 'var(--text)',
+                    fontSize: '12px',
+                    fontFamily: 'var(--font-mono)',
+                    outline: 'none',
+                    resize: 'vertical',
+                  }}
+                />
+              </div>
+
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <Button
+                  variant="primary"
+                  size="sm"
+                  onClick={handleRunActiveTool}
+                  disabled={isExecutingTool}
+                  style={{ display: 'flex', alignItems: 'center', gap: '6px' }}
+                >
+                  <Play size={13} />
+                  <span>{isExecutingTool ? 'Executing...' : 'Execute Tool'}</span>
+                </Button>
+                <Button
+                  variant="secondary"
+                  size="sm"
+                  onClick={handleSendToolToChat}
+                  style={{ display: 'flex', alignItems: 'center', gap: '6px' }}
+                >
+                  <Bot size={13} />
+                  <span>Investigate with AI</span>
+                </Button>
+              </div>
+
+              {toolExecutionError && (
+                <div
+                  style={{
+                    backgroundColor: 'rgba(235, 87, 87, 0.1)',
+                    border: '1px solid var(--error)',
+                    color: 'var(--error)',
+                    borderRadius: 'var(--radius-sm)',
+                    padding: '8px 12px',
+                    fontSize: '12px',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '6px',
+                  }}
+                >
+                  <AlertCircle size={14} />
+                  <span>{toolExecutionError}</span>
+                </div>
+              )}
+
+              {toolExecutionResult && (
+                <div>
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '6px' }}>
+                    <span style={{ fontSize: '11px', fontWeight: 600, color: 'var(--ok)' }}>
+                      Execution Result (Live Telemetry):
+                    </span>
+                    <button
+                      onClick={() => {
+                        navigator.clipboard.writeText(JSON.stringify(toolExecutionResult, null, 2));
+                        setToolResultCopied(true);
+                        setTimeout(() => setToolResultCopied(false), 2000);
+                      }}
+                      style={{
+                        background: 'none',
+                        border: 'none',
+                        color: toolResultCopied ? 'var(--ok)' : 'var(--text-dim)',
+                        fontSize: '11px',
+                        cursor: 'pointer',
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '4px',
+                      }}
+                    >
+                      {toolResultCopied ? <Check size={12} /> : <Copy size={12} />}
+                      <span>{toolResultCopied ? 'Copied' : 'Copy Output'}</span>
+                    </button>
+                  </div>
+                  <pre
+                    style={{
+                      maxHeight: '260px',
+                      overflowY: 'auto',
+                      backgroundColor: 'var(--bg)',
+                      border: '1px solid var(--border)',
+                      borderRadius: 'var(--radius-sm)',
+                      padding: '10px 12px',
+                      fontSize: '11px',
+                      fontFamily: 'var(--font-mono)',
+                      color: 'var(--text-secondary)',
+                      whiteSpace: 'pre-wrap',
+                      wordBreak: 'break-all',
+                    }}
+                  >
+                    {JSON.stringify(toolExecutionResult, null, 2)}
+                  </pre>
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

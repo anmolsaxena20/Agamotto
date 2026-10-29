@@ -228,5 +228,8 @@ export const validateEvidence = (req, res, next) => forwardJson(req, res, next, 
 export const checkEvidenceItem = (req, res, next) =>
   forwardJson(req, res, next, `evidence/check/${req.params.kind}/${req.params.itemId}`, 'GET');
 export const listMcpTools = (req, res, next) => forwardJson(req, res, next, 'mcp/tools', 'GET');
+export const executeMcpTool = (req, res, next) =>
+  forwardJson(req, res, next, `mcp/tools/${req.params.toolName}`, 'POST');
 export const toggleMcpTool = (req, res, next) => forwardJson(req, res, next, 'mcp/tools/toggle', 'POST');
 export const checkAiHealth = (req, res, next) => forwardJson(req, res, next, 'healthz', 'GET');
+

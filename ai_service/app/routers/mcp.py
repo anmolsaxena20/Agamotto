@@ -12,9 +12,9 @@ from __future__ import annotations
 
 import logging
 from typing import Optional, Dict, Any, List
-from fastapi import APIRouter, Depends, HTTPException, status, Body
+from fastapi import APIRouter, Depends, HTTPException, Request, status, Body
 
-from app.auth import get_current_org
+from app.auth import get_current_org, _extract_token
 from app.config import get_settings
 from app.mcp.context import (
     set_auth_context,
@@ -93,6 +93,7 @@ async def get_mcp_client_config(auth: dict = Depends(get_current_org)):
 @router.post("/tools/{tool_name}")
 async def call_mcp_tool(
     tool_name: str,
+    request: Request,
     payload: Dict[str, Any] = Body(default_factory=dict),
     auth: dict = Depends(get_current_org),
 ):
@@ -112,11 +113,17 @@ async def call_mcp_tool(
             detail=f"Tool '{tool_name}' has been disabled by an organization administrator.",
         )
 
-    # Establish authenticated tenant context
+    # Establish authenticated tenant context (including token for downstream calls)
+    try:
+        token = _extract_token(request, None)
+    except Exception:
+        token = None
+
     set_auth_context(
         org_id=auth["org_id"],
         visible_services=auth.get("visible_services") or [],
         user_id=auth.get("sub"),
+        token=token,
     )
 
     handler = TOOL_REGISTRY[tool_name]["handler"]

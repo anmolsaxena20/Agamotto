@@ -10,6 +10,7 @@ import {
   validateEvidence,
   checkEvidenceItem,
   listMcpTools,
+  executeMcpTool,
   toggleMcpTool,
   checkAiHealth,
 } from '../controllers/ai.controller.js';
@@ -39,6 +40,7 @@ router.get('/evidence/check/:kind/:itemId', checkEvidenceItem);
 
 // 5. MCP Telemetry Tools Catalog & Management
 router.get('/mcp/tools', listMcpTools);
+router.post('/mcp/tools/:toolName', executeMcpTool);
 router.post('/mcp/tools/toggle', requirePermission('org:update'), toggleMcpTool);
 
 // 6. AI Microservice Health

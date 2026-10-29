@@ -62,6 +62,25 @@ def _merge_intervals(intervals: list[tuple[int, int]]) -> int:
     return sum(e - s for s, e in merged)
 
 
+import time
+_last_sync_by_org: dict[str, float] = {}
+
+def _ensure_org_telemetry_synced(conn, org_id: str) -> None:
+    """Ensure DuckDB has cached the ClickHouse telemetry for this org_id."""
+    now = time.time()
+    last_sync = _last_sync_by_org.get(org_id, 0)
+    if now - last_sync > 30:
+        try:
+            row = conn.execute("SELECT count(*) FROM spans WHERE org_id = ?", [org_id]).fetchone()
+            count = row[0] if row else 0
+            if count == 0 or (now - last_sync > 60):
+                from app.database import sync_telemetry_from_clickhouse
+                sync_telemetry_from_clickhouse(conn, org_id)
+                _last_sync_by_org[org_id] = now
+        except Exception as e:
+            logger.debug("Failed on-demand sync from ClickHouse: %s", e)
+
+
 class TelemetryStoreClient:
     """Client for retrieving read-only telemetry for MCP tools."""
 
@@ -75,6 +94,7 @@ class TelemetryStoreClient:
         services = _effective_services(filter_obj.services, visible)
 
         conn = app.database.get_db()
+        _ensure_org_telemetry_synced(conn, org_id)
         conditions = ["org_id = ?"]
         params: list[Any] = [org_id]
 
@@ -148,6 +168,7 @@ class TelemetryStoreClient:
         capped_limit = min(max(1, limit), 50)
 
         conn = app.database.get_db()
+        _ensure_org_telemetry_synced(conn, org_id)
         conditions = ["org_id = ?"]
         params: list[Any] = [org_id]
 
@@ -244,6 +265,7 @@ class TelemetryStoreClient:
         capped_limit = min(max(1, limit), 50)
 
         conn = app.database.get_db()
+        _ensure_org_telemetry_synced(conn, org_id)
         conditions = ["org_id = ?", "is_error = TRUE", "error_fingerprint IS NOT NULL", "error_fingerprint != ''"]
         params: list[Any] = [org_id]
 
@@ -301,6 +323,7 @@ class TelemetryStoreClient:
         visible = get_active_visible_services()
 
         conn = app.database.get_db()
+        _ensure_org_telemetry_synced(conn, org_id)
         sql = """
             SELECT
                 span_id,
@@ -427,6 +450,7 @@ class TelemetryStoreClient:
         capped_limit = min(max(1, filter_obj.limit), 50)  # Specification: capped at 50
 
         conn = app.database.get_db()
+        _ensure_org_telemetry_synced(conn, org_id)
         conditions = ["org_id = ?"]
         params: list[Any] = [org_id]
 
@@ -597,6 +621,7 @@ class TelemetryStoreClient:
         services = _effective_services(filter_obj.services, visible)
 
         conn = app.database.get_db()
+        _ensure_org_telemetry_synced(conn, org_id)
         conditions = ["c.org_id = ?", "c.service_name != p.service_name"]
         params: list[Any] = [org_id]
 

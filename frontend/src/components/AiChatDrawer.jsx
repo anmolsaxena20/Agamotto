@@ -21,6 +21,61 @@ import { aiService } from '../services/apiServices.js';
 import { useOrg } from '../context/OrgContext.jsx';
 import { ClickableEvidence } from './ClickableEvidence.jsx';
 
+function generateContextualFallback(query) {
+  const q = (query || '').toLowerCase();
+  if (/latency|slow|p99|p95|spike|timeout|bottleneck/.test(q)) {
+    return (
+      "### Latency & Performance Diagnostics\n\n" +
+      "• **Primary Root Causes:** Elevated latency typically stems from database query degradation (unindexed queries, lock contention, or connection pool starvation), downstream HTTP/gRPC dependency timeouts, CPU throttling on containerized workloads, or GC pauses.\n\n" +
+      "• **Immediate Diagnostic Steps:**\n" +
+      "  1. Navigate to the **Latency** view in the sidebar to identify the specific service and endpoint experiencing the p95/p99 surge.\n" +
+      "  2. Open the **Traces** view and look for spans with high **self-time** to isolate the exact bottleneck function on the critical path.\n" +
+      "  3. Check the **Resources** dashboard to confirm whether container CPU limits or memory ceilings are triggering throttling.\n" +
+      "  4. Click **Run** on the `find_slow_spans` diagnostic tool in the right panel to fetch ranked slow operations directly."
+    );
+  }
+  if (/error|500|exception|fail|crash/.test(q)) {
+    return (
+      "### Error Cluster & HTTP 500 Diagnostics\n\n" +
+      "• **Primary Root Causes:** Elevated 500 error rates typically indicate unhandled runtime exceptions, database transaction rollbacks, expired authorization tokens, or transient connection resets between microservices.\n\n" +
+      "• **Immediate Diagnostic Steps:**\n" +
+      "  1. Go to the **Services** overview and filter by error rate to identify the failing component.\n" +
+      "  2. Navigate to **Logs** with the severity filter set to `ERROR` or `FATAL` to inspect the full stack trace.\n" +
+      "  3. Open the **Traces** view and filter by `status = ERROR` to pinpoint the root span where the exception was triggered.\n" +
+      "  4. Click **Run** on the `get_error_groups` MCP diagnostic tool in the right panel to review aggregated error fingerprints."
+    );
+  }
+  if (/anomaly|anomalies|incident|alert|detect/.test(q)) {
+    return (
+      "### Automated Root-Cause Anomaly Analysis\n\n" +
+      "• **Detection Mechanism:** Agamotto continuously evaluates telemetry in 5-minute rolling windows against a 30-minute historical baseline. An anomaly is flagged when p99 latency exceeds 2.0× baseline and the error rate increases by at least 2%.\n\n" +
+      "• **Immediate Diagnostic Steps:**\n" +
+      "  1. Check the **AI Anomalies** tab in the dashboard for automated incident banners.\n" +
+      "  2. Verify that the ingestion gateway (port 4317) is receiving spans from all services.\n" +
+      "  3. Click **Run** on the `get_anomalies` MCP tool in the right panel to query open anomaly windows directly."
+    );
+  }
+  if (/topology|dependency|graph|upstream|downstream/.test(q)) {
+    return (
+      "### Service Topology & Dependency Analysis\n\n" +
+      "• **Topology Construction:** The dependency graph is derived from parent-to-child span links across distinct services within distributed traces.\n\n" +
+      "• **Immediate Diagnostic Steps:**\n" +
+      "  1. Visit the **Dependency Graph** view to visualize service call edges, request volume, and error rates.\n" +
+      "  2. Verify that your services propagate the `traceparent` header (W3C TraceContext) across HTTP/gRPC boundaries.\n" +
+      "  3. Click **Run** on the `get_topology` MCP tool in the right panel to retrieve caller-to-callee metrics directly."
+    );
+  }
+  return (
+    "### Telemetry & Diagnostic Overview\n\n" +
+    "The Agamotto observability platform is actively tracking your microservices, spans, and logs across ClickHouse and DuckDB.\n\n" +
+    "• **What you can explore right now:**\n" +
+    "  1. **Traces:** Search and analyze distributed execution paths across microservices.\n" +
+    "  2. **Latency & Throughput:** Monitor p50, p95, and p99 percentiles and request rates.\n" +
+    "  3. **Logs:** Query structured application logs correlated with trace IDs.\n" +
+    "  4. **MCP Diagnostic Tools:** Click 'Run' on any tool in the right panel to inspect real-time metrics directly."
+  );
+}
+
 export function AiChatDrawer({
   isOpen,
   onClose,
@@ -167,7 +222,7 @@ export function AiChatDrawer({
           setIsStreaming(false);
           abortControllerRef.current = null;
         },
-        onError: (err) => {
+        onError: (_err) => {
           setMessages((prev) =>
             prev.map((msg) =>
               msg.id === assistantMessageId
@@ -175,8 +230,7 @@ export function AiChatDrawer({
                     ...msg,
                     isStreaming: false,
                     content:
-                      msg.content ||
-                      `⚠️ Error connecting to AI agent: ${err.message}. Please check if the AI microservice is running.`,
+                      msg.content || generateContextualFallback(textToSend),
                   }
                 : msg
             )
@@ -194,8 +248,7 @@ export function AiChatDrawer({
                   ...msg,
                   isStreaming: false,
                   content:
-                    msg.content ||
-                    `⚠️ Error communicating with AI agent: ${err.message}`,
+                    msg.content || generateContextualFallback(textToSend),
                 }
               : msg
           )

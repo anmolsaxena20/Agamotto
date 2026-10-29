@@ -384,7 +384,11 @@ export const aiService = {
               } else if (currentEvent === 'answer' || parsed.summary !== undefined) {
                 let formattedAnswer = parsed.summary || '';
                 if (parsed.hypotheses && Array.isArray(parsed.hypotheses) && parsed.hypotheses.length > 0) {
-                  formattedAnswer += '\n\n**Investigative Hypotheses:**\n' + parsed.hypotheses.map((h) => `- ${h}`).join('\n');
+                  formattedAnswer += '\n\n**Investigative Hypotheses:**\n' + parsed.hypotheses.map((h) => {
+                    const text = typeof h === 'string' ? h : (h.text || JSON.stringify(h));
+                    const confidence = typeof h === 'object' && h.confidence ? ` *(${h.confidence} confidence)*` : '';
+                    return `- ${text}${confidence}`;
+                  }).join('\n');
                 }
                 if (parsed.next_steps && Array.isArray(parsed.next_steps) && parsed.next_steps.length > 0) {
                   formattedAnswer += '\n\n**Recommended Next Steps:**\n' + parsed.next_steps.map((s) => `- ${s}`).join('\n');
@@ -462,6 +466,13 @@ export const aiService = {
     return apiRequest(`/orgs/${orgId}/ai/mcp/tools`);
   },
 
+  async executeMcpTool(orgId, name, payload = {}) {
+    return apiRequest(`/orgs/${orgId}/ai/mcp/tools/${name}`, {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    });
+  },
+
   async toggleMcpTool(orgId, name, enabled = true) {
     return apiRequest(`/orgs/${orgId}/ai/mcp/tools/${name}/toggle`, {
       method: 'POST',
@@ -469,3 +480,4 @@ export const aiService = {
     });
   },
 };
+

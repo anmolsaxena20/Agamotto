@@ -47,8 +47,12 @@ async def lifespan(app: FastAPI):
     try:
         init_clickhouse_schema()
         logger.info("ClickHouse initialized at %s:%s", cfg.CLICKHOUSE_HOST, cfg.CLICKHOUSE_PORT)
+        # Sync existing ClickHouse telemetry into DuckDB on startup
+        from .database import sync_telemetry_from_clickhouse
+        sync_stats = sync_telemetry_from_clickhouse(conn)
+        logger.info("Synced telemetry from ClickHouse to DuckDB on startup: %s", sync_stats)
     except Exception as e:
-        logger.warning("ClickHouse initial connection warning: %s", e)
+        logger.warning("ClickHouse initial connection/sync warning: %s", e)
 
     # Start the 30-second background anomaly detector scheduler
     scheduler_task = asyncio.create_task(run_scheduler())
